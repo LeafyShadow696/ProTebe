@@ -214,6 +214,8 @@ export default function RomanceApp() {
         loadDocsContent(journalDocId);
       }
     }
+  // The loader functions intentionally run only when auth/doc state changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleToken, journalDocId]);
 
   async function loadDocsContent(docId: string) {
@@ -233,8 +235,11 @@ export default function RomanceApp() {
 
   const handleCreateJournal = async () => {
     if (!googleToken) return;
-    const confirmed = window.confirm("Opravdu si přejete vytvořit zbrusu nový společný deník 'FáFa & Beru - Náš společný deník' v Google Docs?");
-    if (!confirmed) return;
+    if (!(await requestConfirm({
+      title: 'Vytvořit deník?',
+      message: "Vytvoří se nový společný deník 'FáFa & Beru - Náš společný deník' v Google Docs.",
+      confirmText: 'Vytvořit',
+    }))) return;
     
     setIsJournalLoading(true);
     setDocsStatus("Zahajuji kódování a vytvářím tvůj překrásný deník lásky...");
@@ -272,9 +277,13 @@ export default function RomanceApp() {
     }
   };
 
-  const handleDisconnectDoc = () => {
-    const confirmed = window.confirm("Přejete si odpojit tento Google Doc? Data samotná v Google Docs zůstanou zachována.");
-    if (!confirmed) return;
+  const handleDisconnectDoc = async () => {
+    if (!(await requestConfirm({
+      title: 'Odpojit dokument?',
+      message: 'Data samotná v Google Docs zůstanou zachována.',
+      confirmText: 'Odpojit',
+      isDestructive: true,
+    }))) return;
     setJournalDocId('');
     setJournalContent('');
     localStorage.removeItem('love_journal_doc_id');
@@ -287,8 +296,11 @@ export default function RomanceApp() {
     const signature = userRole === 'boyfriend' ? 'FáFa' : 'Beru';
     const contentToAppend = `✍️ ${formattedDate} — Zápisek od ${signature}:\n"${newJournalText.trim()}"\n\n-----------------------------\n\n`;
 
-    const confirmed = window.confirm(`Přejete si zapsat tuto novou společnou vzpomínku do vašeho Google Dokumentu?\n\n"${newJournalText.trim()}"`);
-    if (!confirmed) return;
+    if (!(await requestConfirm({
+      title: 'Zapsat vzpomínku?',
+      message: newJournalText.trim(),
+      confirmText: 'Zapsat',
+    }))) return;
 
     setIsJournalLoading(true);
     try {
@@ -317,11 +329,20 @@ export default function RomanceApp() {
     }
   }
 
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
   const handleSendLoveLetter = async () => {
     if (!googleToken || !partnerEmail.trim() || !emailMessage.trim()) return;
     
     const senderName = userRole === 'boyfriend' ? 'FáFa' : 'Beru';
     const finalSubject = `💌 Beru & FáFa: ${emailSubject.trim()}`;
+    const safeEmailMessage = escapeHtml(emailMessage).replace(/\n/g, '<br/>');
     
     let templateHtml = ``;
     if (emailTemplate === 'rose') {
@@ -329,7 +350,7 @@ export default function RomanceApp() {
         <div style="font-family: 'Georgia', serif; background-color: #FFF0F2; padding: 40px; border-radius: 24px; max-width: 600px; margin: 0 auto; border: 2px solid #FFA3B1;">
           <div style="text-align: center; font-size: 40px; margin-bottom: 20px;">🌹</div>
           <h2 style="color: #9F1239; text-align: center; margin-bottom: 30px; border-bottom: 1px dashed #FFA3B1; padding-bottom: 15px;">Milostné psaní pro Tebe</h2>
-          <div style="font-size: 16px; color: #4C0519; line-height: 1.8; white-space: pre-wrap; background: white; padding: 25px; border-radius: 16px; border: 1px solid #FFE4E6; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">${emailMessage.replace(/\n/g, '<br/>')}</div>
+          <div style="font-size: 16px; color: #4C0519; line-height: 1.8; white-space: pre-wrap; background: white; padding: 25px; border-radius: 16px; border: 1px solid #FFE4E6; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">${safeEmailMessage}</div>
           <div style="margin-top: 30px; text-align: right; font-style: italic; color: #9F1239; font-size: 18px; font-weight: bold;">
             S nekonečnou láskou, <br/>
             tvůj milující ${senderName} 💖
@@ -344,7 +365,7 @@ export default function RomanceApp() {
         <div style="font-family: 'Courier New', monospace; background-color: #0F172A; padding: 40px; border-radius: 24px; max-width: 600px; margin: 0 auto; border: 2px solid #38BDF8; color: #F8FAFC;">
           <div style="text-align: center; font-size: 40px; margin-bottom: 20px;">✨🌌</div>
           <h2 style="color: #38BDF8; text-align: center; margin-bottom: 30px; border-bottom: 1px dashed #334155; padding-bottom: 15px;">Dopis napsaný ve hvězdách</h2>
-          <div style="font-size: 15px; color: #E2E8F0; line-height: 1.8; white-space: pre-wrap; background: #1E293B; padding: 25px; border-radius: 16px; border: 1px solid #334155;">${emailMessage.replace(/\n/g, '<br/>')}</div>
+          <div style="font-size: 15px; color: #E2E8F0; line-height: 1.8; white-space: pre-wrap; background: #1E293B; padding: 25px; border-radius: 16px; border: 1px solid #334155;">${safeEmailMessage}</div>
           <div style="margin-top: 30px; text-align: right; font-style: italic; color: #38BDF8; font-size: 18px; font-weight: bold;">
             Tvá spřízněná duše, <br/>
             ${senderName} 💫
@@ -359,7 +380,7 @@ export default function RomanceApp() {
         <div style="font-family: 'Helvetica', sans-serif; background-color: #F8FAFC; padding: 40px; border-radius: 24px; max-width: 600px; margin: 0 auto; border: 2px solid #F1F5F9;">
           <div style="text-align: center; font-size: 40px; margin-bottom: 20px;">❤️💌</div>
           <h2 style="color: #0F172A; text-align: center; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 0.05em;">Moderní romantické vyznání</h2>
-          <div style="font-size: 16px; color: #334155; line-height: 1.8; white-space: pre-wrap; background: white; padding: 25px; border-radius: 16px; border: 1px solid #E2E8F0;">${emailMessage.replace(/\n/g, '<br/>')}</div>
+          <div style="font-size: 16px; color: #334155; line-height: 1.8; white-space: pre-wrap; background: white; padding: 25px; border-radius: 16px; border: 1px solid #E2E8F0;">${safeEmailMessage}</div>
           <div style="margin-top: 30px; text-align: right; font-weight: bold; color: #0F172A; font-size: 18px;">
             Tvůj největší fanoušek, <br/>
             ${senderName} 😍
@@ -368,19 +389,22 @@ export default function RomanceApp() {
       `;
     }
 
-    const confirmed = window.confirm(`Opravdu chcete odeslat tento milostný dopis z vaší Gmail adresy na adresu ${partnerEmail}?`);
-    if (!confirmed) return;
+    if (!(await requestConfirm({
+      title: 'Odeslat dopis?',
+      message: `Dopis se odešle z vaší Gmail adresy na ${partnerEmail}.`,
+      confirmText: 'Odeslat',
+    }))) return;
 
     setIsSendingEmail(true);
     try {
       await sendEmailLoveLetter(googleToken, partnerEmail, finalSubject, templateHtml);
       setEmailMessage('');
       setEmailSubject('Milostný vzkazík... ❤️');
-      alert("Milostný dopis byl úspěšně vypuštěn a odeslán přes tvůj Gmail! 💌");
+      triggerAlert('Odesláno', 'Milostný dopis byl úspěšně odeslán přes Gmail.', '💌');
       await loadGmailLoveLetters();
     } catch (err) {
       console.error(err);
-      alert("Nastala chyba při odesílání dopisu přes Gmail.");
+      triggerAlert('Chyba', 'Nastala chyba při odesílání dopisu přes Gmail.', '⚠️');
     } finally {
       setIsSendingEmail(false);
     }
@@ -411,8 +435,11 @@ export default function RomanceApp() {
     const signature = userRole === 'boyfriend' ? 'FáFa' : 'Beru';
     const textToSend = `💖 [Romance] Vzkaz od ${signature}: "${messageToSend.trim()}"`;
 
-    const confirmed = window.confirm("Opravdu chcete poslat tuto rychlou chat zprávu do vybraného Google Chat prostoru?");
-    if (!confirmed) return;
+    if (!(await requestConfirm({
+      title: 'Odeslat zprávu?',
+      message: 'Rychlý vzkaz se odešle do vybraného Google Chat prostoru.',
+      confirmText: 'Odeslat',
+    }))) return;
 
     setIsSendingChatMessage(true);
     try {
@@ -434,17 +461,21 @@ export default function RomanceApp() {
       if (res) {
         setGoogleUser(res.user);
         setGoogleToken(res.accessToken);
-        alert(`Přihlášení úspěšné! Vítej v Google Workspace Koutku, ${res.user.displayName || 'střapaté štěstí'}.`);
+        triggerAlert('Přihlášeno', `Vítej v Google Workspace koutku, ${res.user.displayName || 'lásko'}.`, '✨');
       }
     } catch (err) {
       console.error(err);
-      alert("Chyba při přihlašování přes Google.");
+      triggerAlert('Chyba přihlášení', 'Přihlášení přes Google se nepodařilo.', '⚠️');
     }
   };
 
   const handleGoogleLogout = async () => {
-    const confirmed = window.confirm("Opravdu se chcete odhlásit z Google Workspace?");
-    if (!confirmed) return;
+    if (!(await requestConfirm({
+      title: 'Odhlásit Google?',
+      message: 'Google Workspace funkce se do dalšího přihlášení odpojí.',
+      confirmText: 'Odhlásit',
+      isDestructive: true,
+    }))) return;
     await googleLogout();
     setGoogleUser(null);
     setGoogleToken(null);
@@ -471,7 +502,7 @@ export default function RomanceApp() {
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
-  // Custom Confirm & Alert Dialogs States (Fixes sandbox iframe window.confirm/alert blocks!)
+  // Custom modal dialog states for PWA-friendly confirmations and notices.
   interface CustomConfirmConfig {
     title: string;
     message: string;
@@ -479,6 +510,7 @@ export default function RomanceApp() {
     cancelText?: string;
     isDestructive?: boolean;
     onConfirm: () => void;
+    onCancel?: () => void;
   }
   const [customConfirm, setCustomConfirm] = useState<CustomConfirmConfig | null>(null);
   
@@ -492,6 +524,22 @@ export default function RomanceApp() {
 
   const triggerAlert = (title: string, message: string, icon = '✨') => {
     setCustomAlert({ title, message, icon });
+  };
+
+  const requestConfirm = (config: Omit<CustomConfirmConfig, 'onConfirm'>): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setCustomConfirm({
+        ...config,
+        onConfirm: () => {
+          setCustomConfirm(null);
+          resolve(true);
+        },
+        onCancel: () => {
+          setCustomConfirm(null);
+          resolve(false);
+        },
+      });
+    });
   };
 
   // Naše místa (Special Places) Default Data
@@ -679,6 +727,8 @@ export default function RomanceApp() {
     }, 0);
 
     return () => clearTimeout(timer);
+    // Defaults are written once on mount from the initial localStorage-backed state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save changes wrapper
@@ -834,7 +884,7 @@ export default function RomanceApp() {
       }
     } else {
       copyToClipboard();
-      alert("Text vyznání byl zkopírován! Nyní jej můžeš poslat Michaelce do libovolné chatovací aplikace.");
+      triggerAlert('Zkopírováno', 'Text vyznání je ve schránce a můžeš jej poslat v libovolné aplikaci.', '📋');
     }
   };
 
@@ -1318,25 +1368,8 @@ export default function RomanceApp() {
         ))}
       </div>
 
-      {/* Main Apple iPhone Outer Shell Wrapper for Desktop / Fluent stretch on Mobile */}
-      <div className="max-w-md mx-auto md:my-6 md:rounded-[40px] md:shadow-2xl md:border-[10px] md:border-[#1C1C1E] bg-[#F2F2F7] relative overflow-hidden flex flex-col min-h-screen md:min-h-[850px] md:max-h-[900px] transition-all" id="device-shell">
-        
-        {/* iOS Mock StatusBar (Desktop Design Element) */}
-        <div className="bg-[#F2F2F7] text-[#1C1C1E] px-6 pt-3 pb-2 text-xs flex justify-between items-center select-none font-medium h-10 shrink-0 border-b border-gray-200/20" id="ios-status-bar">
-          <div className="flex items-center gap-1 font-semibold text-gray-800">
-            <Clock className="w-3.5 h-3.5" />
-            <span>09:41</span>
-          </div>
-          <div className="text-center italic font-bold tracking-tight text-gray-850">
-            Beru & FáFa 💞
-          </div>
-          <div className="flex items-center gap-2 font-semibold text-gray-800">
-            <span>5G</span>
-            <div className="w-5 h-2.5 border border-gray-750 rounded-xs p-0.5 flex items-center">
-              <div className="bg-gray-800 h-full w-full rounded-2xs" />
-            </div>
-          </div>
-        </div>
+      {/* Mobile-first PWA shell */}
+      <div className="min-h-dvh w-full max-w-3xl mx-auto bg-[#F2F2F7] relative overflow-x-hidden flex flex-col transition-all" id="app-shell">
 
         {/* Dynamic iOS Sticky Header Banner */}
         <div className="bg-white border-b border-[#D1D1D6]/80 text-[#1C1C1E] px-5 py-3 flex flex-col gap-2 shrink-0 relative shadow-xs" id="sticky-header">
@@ -1414,7 +1447,7 @@ export default function RomanceApp() {
                     if (syncCodeInput.trim().length > 3) {
                       setRelationshipCode(syncCodeInput.trim().toUpperCase());
                       setSyncCodeInput('');
-                      alert("Váš láskyplný prostor byl úspěšně synchronizován a propojen! 💖");
+                      triggerAlert('Propojeno', 'Váš láskyplný prostor byl úspěšně synchronizován.', '💖');
                     }
                   }}
                   className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white px-3 py-1.5 rounded-lg font-bold transition-all text-xs shadow-xs"
@@ -1427,7 +1460,7 @@ export default function RomanceApp() {
         </div>
 
         {/* Scrollable View Area Frame */}
-        <div className="flex-1 overflow-y-auto px-4 py-5 pb-24 relative" id="scroll-workspace">
+        <div className="flex-1 overflow-y-auto px-4 py-5 pb-28 relative" id="scroll-workspace">
           
           <AnimatePresence mode="wait">
             {/* TAB 1: COUNTER (LÁSKA) */}
@@ -1867,6 +1900,7 @@ export default function RomanceApp() {
                           >
                             <div className="relative aspect-square overflow-hidden bg-[#F2F2F7] flex items-center justify-center">
                               {/* Native referrer check applied according to guidelines */}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={p.url}
                                 alt={p.caption}
@@ -1927,6 +1961,7 @@ export default function RomanceApp() {
                             </button>
 
                             <div className="max-w-md max-h-[480px] w-full h-full relative flex items-center justify-center">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={filteredPhotos[lightboxIndex]?.url}
                                 alt={filteredPhotos[lightboxIndex]?.caption}
@@ -2365,7 +2400,7 @@ export default function RomanceApp() {
                     <button
                       type="button"
                       onClick={() => setShowAddPlace(true)}
-                      className="bg-white hover:bg-gray-50 text-gray-750 font-bold py-3 px-4 rounded-[16px] text-xs border border-[#E5E5EA] shadow-2xs transition-all flex items-center justify-center gap-2"
+                      className="bg-white hover:bg-gray-50 text-gray-700 font-bold py-3 px-4 rounded-[16px] text-xs border border-[#E5E5EA] shadow-2xs transition-all flex items-center justify-center gap-2"
                     >
                       <Plus className="w-4 h-4 text-[#FF2D55]" />
                       <span>Zaznamenat další naše rande</span>
@@ -2694,8 +2729,8 @@ export default function RomanceApp() {
                             <textarea
                               placeholder="Napiš ty nejkrásnější řádky přímo ze srdce... 🥰 Vypustíme je přímo přes tvůj Gmail."
                               className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full h-24 resize-none focus:ring-1 focus:ring-[#FF2D55] text-gray-800"
-                              value={gmailLetterText}
-                              onChange={(e) => setGmailLetterText(e.target.value)}
+                              value={emailMessage}
+                              onChange={(e) => setEmailMessage(e.target.value)}
                             />
 
                             <button
@@ -2723,21 +2758,21 @@ export default function RomanceApp() {
                               type="text"
                               placeholder="Název prostoru (např. spaces/love_room)"
                               className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800 font-mono"
-                              value={chatSpaceName}
-                              onChange={(e) => setChatSpaceName(e.target.value)}
+                              value={selectedSpace}
+                              onChange={(e) => setSelectedSpace(e.target.value)}
                             />
                             
                             <input
                               type="text"
                               placeholder="Krátký rychlý vzkaz k vypálení..."
                               className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800"
-                              value={chatMessageText}
-                              onChange={(e) => setChatMessageText(e.target.value)}
+                              value={customChatMessage}
+                              onChange={(e) => setCustomChatMessage(e.target.value)}
                             />
 
                             <button
                               type="button"
-                              onClick={handleSendChatMessage}
+                              onClick={() => handleSendChatMessage()}
                               className="bg-gray-900 hover:bg-gray-800 text-white font-bold py-3 rounded-[14px] text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
                             >
                               <MessageCircle className="w-4 h-4 text-[#FF2D55]" />
@@ -2758,7 +2793,7 @@ export default function RomanceApp() {
                                     key={idx}
                                     type="button"
                                     onClick={() => {
-                                      setChatMessageText(preset);
+                                      setCustomChatMessage(preset);
                                       triggerAlert("Připraveno", `Vzkaz "${preset}" byl vybrán. Můžeš jej odeslat tlačítkem výše!`, "💬");
                                     }}
                                     className="bg-red-50 hover:bg-[#FFE5E9] text-[#FF2D55] text-[10px] font-bold px-3 py-1.5 rounded-full transition-all border border-[#FF2D55]/10"
@@ -2848,6 +2883,7 @@ export default function RomanceApp() {
                 {/* Professional vCard Metadata Author Signature */}
                 <div className="bg-[#FFE5E3]/10 rounded-[24px] p-5 border border-[#FF2D55]/10 mt-2 flex flex-col gap-3" id="vcard-author">
                   <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src="https://fkdev.xyz/pwa-icon-512.png"
                       alt="František Kalášek Logo"
@@ -2887,8 +2923,8 @@ export default function RomanceApp() {
 
         </div>
 
-        {/* Beautiful Elegant Native Bottom iOS Navigation Panel with 5 columns for phone view */}
-        <div className="absolute bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-gray-100 py-2.5 px-3 flex justify-between items-center z-40 h-16 shrink-0" id="ios-bottom-nav">
+        {/* Native bottom navigation for PWA/mobile */}
+        <div className="fixed bottom-0 left-1/2 w-full max-w-3xl -translate-x-1/2 bg-white/95 backdrop-blur-md border-t border-gray-100 px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] flex justify-between items-center z-40 min-h-16 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]" id="ios-bottom-nav">
           
           <button
             type="button"
@@ -2970,7 +3006,10 @@ export default function RomanceApp() {
                 <div className="flex border-t border-gray-200/50 h-11 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setCustomConfirm(null)}
+                    onClick={() => {
+                      if (customConfirm.onCancel) customConfirm.onCancel();
+                      else setCustomConfirm(null);
+                    }}
                     className="flex-1 font-semibold text-xs text-blue-500 hover:bg-gray-50 active:bg-gray-100 transition-colors border-r border-gray-200/50"
                   >
                     {customConfirm.cancelText || 'Zrušit'}

@@ -1,18 +1,19 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
-
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json(
+        { error: "AI básník není nakonfigurovaný. Doplňte GEMINI_API_KEY v prostředí aplikace." },
+        { status: 503 }
+      );
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+    });
+
     const { category, customInput } = await req.json();
 
     const dateMet = "3. dubna 2026"; // 3.4.2026
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     prompt += "\nOdpověď vrať čistě jako文本 (text), bez uvozovek na začátku a na konci, bez nadpisu, zformátované do pěkných odstavců nebo veršů.";
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
       contents: prompt,
       config: {
         temperature: 0.9,
