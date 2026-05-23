@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "Photo": {
+      "title": "Photo Entity",
+      "description": "A shared romance photo memory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "url": { "type": "string" },
+        "caption": { "type": "string" },
+        "date": { "type": "string" },
+        "isFavorite": { "type": "boolean" }
+      },
+      "required": ["id", "url", "caption", "date", "isFavorite"]
+    },
+    "Note": {
+      "title": "Note Entity",
+      "description": "A shared love message/vzkaz",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "author": { "type": "string" },
+        "date": { "type": "string" },
+        "isPinned": { "type": "boolean" },
+        "reactions": { "type": "object" }
+      },
+      "required": ["id", "text", "author", "date", "isPinned"]
+    },
+    "Milestone": {
+      "title": "Milestone Entity",
+      "description": "A calendar memory milestone",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "emoji": { "type": "string" }
+      },
+      "required": ["id", "date", "title", "description", "emoji"]
+    }
+  },
+  "firestore": {
+    "photos/{photoId}": {
+      "schema": "Photo",
+      "description": "Collection of shared romance photos"
+    },
+    "notes/{noteId}": {
+      "schema": "Note",
+      "description": "Collection of shared love messages/vzkazy"
+    },
+    "milestones/{milestoneId}": {
+      "schema": "Milestone",
+      "description": "Collection of anniversary milestones and events"
+    }
+  }
+}

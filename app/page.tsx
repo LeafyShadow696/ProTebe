@@ -25,8 +25,42 @@ import {
   Info,
   ChevronLeft,
   X,
-  Sparkle
+  Sparkle,
+  FileText,
+  UserCheck,
+  Globe,
+  LogOut,
+  CalendarDays,
+  CloudLightning
 } from 'lucide-react';
+
+// Firebase & Google Workspace utilities
+import { 
+  db, 
+  initAuth, 
+  googleSignIn, 
+  googleSignOut, 
+  handleFirestoreError, 
+  OperationType 
+} from '@/lib/firebase';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  getDoc 
+} from 'firebase/firestore';
+import { 
+  createGoogleCalendarEvent, 
+  fetchGoogleCalendarEvents, 
+  createGoogleDocWithContent, 
+  uploadBackupToDrive, 
+  fetchGoogleChatSpaces, 
+  postMessageToGoogleChat, 
+  fetchGoogleContacts 
+} from '@/lib/workspace';
+
 
 // Enum for Views
 enum Tab {
@@ -81,9 +115,46 @@ interface FloatingHeart {
   velocity: { x: number; y: number };
 }
 
+function generateId(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
 export default function RomanceApp() {
   // ---- APP INITIAL STATES ----
   const RELATIONSHIP_START = '2026-04-03T00:00:00';
+
+  // Firebase & Google Workspace Auth state
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
+
+  // Contacts picker state
+  const [showContactsModal, setShowContactsModal] = useState<boolean>(false);
+  const [contactsList, setContactsList] = useState<any[]>([]);
+  const [isLoadingContacts, setIsLoadingContacts] = useState<boolean>(false);
+
+  // Chat message sender state
+  const [showChatModal, setShowChatModal] = useState<boolean>(false);
+  const [chatSpaces, setChatSpaces] = useState<any[]>([]);
+  const [selectedChatSpace, setSelectedChatSpace] = useState<string>('');
+  const [textToSendToChat, setTextToSendToChat] = useState<string>('');
+  const [chatSendSuccess, setChatSendSuccess] = useState<boolean>(false);
+  const [chatError, setChatError] = useState<string>('');
+
+  // Calendar importer state
+  const [showCalendarModal, setShowCalendarModal] = useState<boolean>(false);
+  const [externalCalendarEvents, setExternalCalendarEvents] = useState<any[]>([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState<boolean>(false);
+  
+  // Custom checkbox state for Calendar sync inside Add Milestone
+  const [addToGoogleCalendarChecked, setAddToGoogleCalendarChecked] = useState<boolean>(false);
+
+  // Doc export state
+  const [exportedDocUrl, setExportedDocUrl] = useState<string>('');
+  const [isExportingDoc, setIsExportingDoc] = useState<boolean>(false);
+
+  // Drive Backup State
+  const [isBackingUpDrive, setIsBackingUpDrive] = useState<boolean>(false);
+  const [backupSuccess, setBackupSuccess] = useState<boolean>(false);
 
   // State with safe client-side lazy initializers
   const [activeTab, setActiveTab] = useState<Tab>(Tab.LOVE_COUNTER);
@@ -283,6 +354,147 @@ export default function RomanceApp() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // ---- FIREBASE AUTH & REAL-TIME FIRESTORE SYNCHRONIZATION ----
+  useEffect(() => {
+    // 1. Initialize Firebase authentication listener
+    const unsubscribeAuth = initAuth(
+      (user, token) => {
+        setCurrentUser(user);
+        if (token) {
+          setGoogleToken(token);
+        }
+      },
+      () => {
+        setCurrentUser(null);
+        setGoogleToken(null);
+      }
+    );
+
+    return () => {
+      unsubscribeAuth();
+    };
+  }, []);
+
+  // Real-time synchronization of Firestore collections to client states
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // A. Listen to Photos (Sync with zero-trust exception catching)
+    const unsubscribePhotos = onSnapshot(collection(db, 'photos'), (snapshot) => {
+      const list: Photo[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as Photo);
+      });
+      if (list.length > 0) {
+        // Sort descending by date
+        list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setGalleryPhotos(list);
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'photos');
+    });
+
+    // B. Listen to Notes (Sweet messages)
+    const unsubscribeNotes = onSnapshot(collection(db, 'notes'), (snapshot) => {
+      const list: Note[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as Note);
+      });
+      if (list.length > 0) {
+        // Sort notes: pinned first, then descending by date
+        list.sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
+        setNotes(list);
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'notes');
+    });
+
+    // C. Listen to Milestones (Timeline events)
+    const unsubscribeMilestones = onSnapshot(collection(db, 'milestones'), (snapshot) => {
+      const list: Milestone[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as Milestone);
+      });
+      if (list.length > 0) {
+        // Sort ascending by date for timeline flow
+        list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        setMilestones(list);
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'milestones');
+    });
+
+    return () => {
+      unsubscribePhotos();
+      unsubscribeNotes();
+      unsubscribeMilestones();
+    };
+  }, [currentUser]);
+
+  // Seeding offline data to Firestore when first signed in
+  const syncLocalToFirestore = async (user: any) => {
+    try {
+      if (!user) return;
+      // Seed gallery photos
+      for (const photo of galleryPhotos) {
+        const docRef = doc(db, 'photos', photo.id);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          await setDoc(docRef, photo);
+        }
+      }
+      // Seed message board notes
+      for (const note of notes) {
+        const docRef = doc(db, 'notes', note.id);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          await setDoc(docRef, note);
+        }
+      }
+      // Seed calendar milestones
+      for (const m of milestones) {
+        const docRef = doc(db, 'milestones', m.id);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          await setDoc(docRef, m);
+        }
+      }
+    } catch (e) {
+      console.warn("Error seeding local data to cloud: ", e);
+    }
+  };
+
+  // Connect Google account pop-up action
+  const handleGoogleConnect = async () => {
+    try {
+      const result = await googleSignIn();
+      if (result) {
+        setCurrentUser(result.user);
+        setGoogleToken(result.accessToken);
+        // Synchronously push local storage data to Cloud Firestore so no memories are lost
+        await syncLocalToFirestore(result.user);
+      }
+    } catch (err) {
+      console.error("Connection failed: ", err);
+    }
+  };
+
+  const handleGoogleDisconnect = async () => {
+    if (confirm("Opravdu chceš odpojit společný Google/Firebase cloud? Aplikace se přepne zpět do offline režimu.")) {
+      try {
+        await googleSignOut();
+        setCurrentUser(null);
+        setGoogleToken(null);
+      } catch (err) {
+        console.error("Disconnect failed: ", err);
+      }
+    }
+  };
 
   // Save changes wrapper
   const saveState = (key: string, data: any) => {
@@ -596,16 +808,22 @@ export default function RomanceApp() {
     const base64Img = canvas.toDataURL('image/jpeg', 0.85);
 
     const newPhoto: Photo = {
-      id: `ai_card_${Date.now()}`,
+      id: generateId('ai_card'),
       url: base64Img,
       caption: `AI Báseň: ${generatedPoem.substring(0, 40)}... generovaná s láskou pro Michaelku.`,
       date: new Date().toISOString().split('T')[0],
       isFavorite: true
     };
 
-    const updatedGallery = [newPhoto, ...galleryPhotos];
-    setGalleryPhotos(updatedGallery);
-    saveState('love_gallery', updatedGallery);
+    if (currentUser) {
+      setDoc(doc(db, 'photos', newPhoto.id), newPhoto).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `photos/${newPhoto.id}`);
+      });
+    } else {
+      const updatedGallery = [newPhoto, ...galleryPhotos];
+      setGalleryPhotos(updatedGallery);
+      saveState('love_gallery', updatedGallery);
+    }
 
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
@@ -659,16 +877,22 @@ export default function RomanceApp() {
         const defaultCaption = uploadCaption.trim() ? uploadCaption : `Krásný společný moment z ${uploadDate || 'dneška'}.`;
         
         const newPhoto: Photo = {
-          id: `photo_${Date.now()}`,
+          id: generateId('photo'),
           url: compressedBase64,
           caption: defaultCaption,
           date: uploadDate || new Date().toISOString().split('T')[0],
           isFavorite: false
         };
 
-        const updatedGallery = [newPhoto, ...galleryPhotos];
-        setGalleryPhotos(updatedGallery);
-        saveState('love_gallery', updatedGallery);
+        if (currentUser) {
+          setDoc(doc(db, 'photos', newPhoto.id), newPhoto).catch((err) => {
+            handleFirestoreError(err, OperationType.WRITE, `photos/${newPhoto.id}`);
+          });
+        } else {
+          const updatedGallery = [newPhoto, ...galleryPhotos];
+          setGalleryPhotos(updatedGallery);
+          saveState('love_gallery', updatedGallery);
+        }
 
         // Reset upload fields
         setUploadCaption('');
@@ -702,22 +926,39 @@ export default function RomanceApp() {
   const deletePhoto = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("Opravdu chceš smazat tuto vzpomínku z galerie?")) return;
-    const updated = galleryPhotos.filter((p) => p.id !== id);
-    setGalleryPhotos(updated);
-    saveState('love_gallery', updated);
+    
+    if (currentUser) {
+      deleteDoc(doc(db, 'photos', id)).catch((err) => {
+        handleFirestoreError(err, OperationType.DELETE, `photos/${id}`);
+      });
+    } else {
+      const updated = galleryPhotos.filter((p) => p.id !== id);
+      setGalleryPhotos(updated);
+      saveState('love_gallery', updated);
+    }
     setLightboxIndex(null);
   };
 
   const toggleFavoritePhoto = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const updated = galleryPhotos.map((p) => {
-      if (p.id === id) {
-        return { ...p, isFavorite: !p.isFavorite };
-      }
-      return p;
-    });
-    setGalleryPhotos(updated);
-    saveState('love_gallery', updated);
+    const photo = galleryPhotos.find(p => p.id === id);
+    if (!photo) return;
+    const isFavNow = !photo.isFavorite;
+
+    if (currentUser) {
+      setDoc(doc(db, 'photos', id), { ...photo, isFavorite: isFavNow }).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `photos/${id}`);
+      });
+    } else {
+      const updated = galleryPhotos.map((p) => {
+        if (p.id === id) {
+          return { ...p, isFavorite: isFavNow };
+        }
+        return p;
+      });
+      setGalleryPhotos(updated);
+      saveState('love_gallery', updated);
+    }
   };
 
   // ---- VZKAZOVNÍK (SWEET MESSAGE BOARD) CONTEXT ----
@@ -727,7 +968,7 @@ export default function RomanceApp() {
     const authorSignature = customAuthor.trim() ? customAuthor : (userRole === 'boyfriend' ? 'Péťa 👑' : 'Michaelka 🌸');
 
     const newNote: Note = {
-      id: `note_${Date.now()}`,
+      id: generateId('note'),
       text: newNoteText.trim(),
       author: authorSignature,
       date: new Date().toISOString(),
@@ -735,9 +976,15 @@ export default function RomanceApp() {
       reactions: { '❤️': 0, '💖': 0, '💕': 0, '💌': 0, '💝': 0 }
     };
 
-    const updatedNotes = [newNote, ...notes];
-    setNotes(updatedNotes);
-    saveState('love_notes', updatedNotes);
+    if (currentUser) {
+      setDoc(doc(db, 'notes', newNote.id), newNote).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `notes/${newNote.id}`);
+      });
+    } else {
+      const updatedNotes = [newNote, ...notes];
+      setNotes(updatedNotes);
+      saveState('love_notes', updatedNotes);
+    }
 
     // Reset fields
     setNewNoteText('');
@@ -745,35 +992,66 @@ export default function RomanceApp() {
   };
 
   const reactToNote = (noteId: string, emoji: '❤️' | '💖' | '💕' | '💌' | '💝') => {
-    const updated = notes.map((n) => {
-      if (n.id === noteId) {
-        const reactionsCopy = { ...n.reactions };
-        reactionsCopy[emoji] = (reactionsCopy[emoji] || 0) + 1;
-        return { ...n, reactions: reactionsCopy };
-      }
-      return n;
-    });
-    setNotes(updated);
-    saveState('love_notes', updated);
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+    const reactionsCopy = { ...note.reactions };
+    reactionsCopy[emoji] = (reactionsCopy[emoji] || 0) + 1;
+
+    if (currentUser) {
+      setDoc(doc(db, 'notes', noteId), { ...note, reactions: reactionsCopy }).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `notes/${noteId}`);
+      });
+    } else {
+      const updated = notes.map((n) => {
+        if (n.id === noteId) {
+          return { ...n, reactions: reactionsCopy };
+        }
+        return n;
+      });
+      setNotes(updated);
+      saveState('love_notes', updated);
+    }
   };
 
   const pinNote = (noteId: string) => {
-    const updated = notes.map((n) => {
-      // Toggle pinned for the selected note, unpin others to have exactly ONE pinned Note of the Day
-      if (n.id === noteId) {
-        return { ...n, isPinned: !n.isPinned };
-      }
-      return { ...n, isPinned: false };
-    });
-    setNotes(updated);
-    saveState('love_notes', updated);
+    const clickedNote = notes.find(n => n.id === noteId);
+    if (!clickedNote) return;
+    const isPinnedNow = !clickedNote.isPinned;
+
+    if (currentUser) {
+      // Pin/unpin notes in Firestore and unpin all other notes so exactly ONE stays pinned
+      notes.forEach((n) => {
+        const nextPinned = n.id === noteId ? isPinnedNow : false;
+        if (n.isPinned !== nextPinned) {
+          setDoc(doc(db, 'notes', n.id), { ...n, isPinned: nextPinned }).catch((err) => {
+            handleFirestoreError(err, OperationType.WRITE, `notes/${n.id}`);
+          });
+        }
+      });
+    } else {
+      const updated = notes.map((n) => {
+        if (n.id === noteId) {
+          return { ...n, isPinned: isPinnedNow };
+        }
+        return { ...n, isPinned: false };
+      });
+      setNotes(updated);
+      saveState('love_notes', updated);
+    }
   };
 
   const deleteNote = (noteId: string) => {
     if (!confirm("Chceš smazat tento vzkaz?")) return;
-    const updated = notes.filter((n) => n.id !== noteId);
-    setNotes(updated);
-    saveState('love_notes', updated);
+    
+    if (currentUser) {
+      deleteDoc(doc(db, 'notes', noteId)).catch((err) => {
+        handleFirestoreError(err, OperationType.DELETE, `notes/${noteId}`);
+      });
+    } else {
+      const updated = notes.filter((n) => n.id !== noteId);
+      setNotes(updated);
+      saveState('love_notes', updated);
+    }
   };
 
   const generateAiVzkazPrompt = () => {
@@ -790,34 +1068,244 @@ export default function RomanceApp() {
   };
 
   // ---- TIMELINE MILESTONES CALENDAR ACTIONS ----
-  const addMilestone = () => {
+  const addMilestone = async () => {
     if (!newMilestoneTitle.trim() || !newMilestoneDate.trim()) return;
 
     const newMiles: Milestone = {
-      id: `miles_${Date.now()}`,
+      id: generateId('miles'),
       date: newMilestoneDate,
       title: newMilestoneTitle.trim(),
       description: newMilestoneDesc.trim() || "Krásný drahocenný den v našich životech.",
       emoji: newMilestoneEmoji
     };
 
-    const updated = [newMiles, ...milestones].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    setMilestones(updated);
-    saveState('love_milestones', updated);
+    // Google Calendar Sync
+    if (addToGoogleCalendarChecked && googleToken) {
+      try {
+        await createGoogleCalendarEvent(googleToken, {
+          summary: `💞 ${newMilestoneTitle.trim()}`,
+          description: newMilestoneDesc.trim() || "Výročí zapsané v našem společném kalendáři lásky.",
+          startDate: newMilestoneDate,
+          endDate: newMilestoneDate
+        });
+        setCalendarSyncSuccess(true);
+        setTimeout(() => setCalendarSyncSuccess(false), 3000);
+      } catch (e) {
+        console.error("Failed to sync to Google Calendar:", e);
+        alert("Milník byl uložen lokálně, ale nepodařilo se jej synchronizovat s tvým Google Kalendářem.");
+      }
+    }
+
+    if (currentUser) {
+      setDoc(doc(db, 'milestones', newMiles.id), newMiles).catch((err) => {
+        handleFirestoreError(err, OperationType.WRITE, `milestones/${newMiles.id}`);
+      });
+    } else {
+      const updated = [newMiles, ...milestones].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setMilestones(updated);
+      saveState('love_milestones', updated);
+    }
 
     // Reset values
     setNewMilestoneTitle('');
     setNewMilestoneDate('');
     setNewMilestoneDesc('');
     setNewMilestoneEmoji('❤️');
+    setAddToGoogleCalendarChecked(false);
     setShowAddMilestone(false);
   };
 
   const deleteMilestone = (id: string) => {
     if (!confirm("Smazat tento milník z našeho společného kalendáře?")) return;
-    const updated = milestones.filter((m) => m.id !== id);
-    setMilestones(updated);
-    saveState('love_milestones', updated);
+    
+    if (currentUser) {
+      deleteDoc(doc(db, 'milestones', id)).catch((err) => {
+        handleFirestoreError(err, OperationType.DELETE, `milestones/${id}`);
+      });
+    } else {
+      const updated = milestones.filter((m) => m.id !== id);
+      setMilestones(updated);
+      saveState('love_milestones', updated);
+    }
+  };
+
+  // State toast alert
+  const [calendarSyncSuccess, setCalendarSyncSuccess] = useState<boolean>(false);
+
+  // ---- GOOGLE DRIVE BACKUP CLIENT ----
+  const handleBackupToDrive = async () => {
+    if (!googleToken) {
+      alert("Pro nahrání zálohy na Google Disk nejdříve připoj svůj Google účet.");
+      return;
+    }
+    setIsBackingUpDrive(true);
+    setBackupSuccess(false);
+    try {
+      let docContent = `======================================\n`;
+      docContent += `   NÁŠ SPOLEČNÝ ZAMILOVANÝ DENÍK\n`;
+      docContent += `   Michaelka & Péťa 💞 \n`;
+      docContent += `   Vytvořeno dne: ${new Date().toLocaleDateString('cs-CZ')}\n`;
+      docContent += `======================================\n\n`;
+
+      docContent += `--- MILNÍKY A VZPOMÍNKY ---\n`;
+      milestones.forEach((m, idx) => {
+        docContent += `[${idx + 1}] ${m.emoji} ${m.date}: ${m.title}\n`;
+        docContent += `    Popis: ${m.description}\n\n`;
+      });
+
+      docContent += `\n--- SPOLEČNÉ VZKAZY (BOARD) ---\n`;
+      notes.forEach((n, idx) => {
+        docContent += `[${idx + 1}] (${new Date(n.date).toLocaleDateString('cs-CZ')}) Od ${n.author}:\n`;
+        docContent += `    "${n.text}"\n`;
+        docContent += `    Pin: ${n.isPinned ? 'Přišpendlený' : 'Standardní'}\n\n`;
+      });
+
+      const fileName = `nas_spolecny_denik_backup_${Date.now()}.txt`;
+      await uploadBackupToDrive(googleToken, fileName, docContent);
+      setBackupSuccess(true);
+      setTimeout(() => setBackupSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert("Chyba při nahrávání zálohy na Disk.");
+    } finally {
+      setIsBackingUpDrive(false);
+    }
+  };
+
+  // ---- GOOGLE DOCS POEM EXPORTER ----
+  const handleExportPoemToDocs = async () => {
+    if (!googleToken) {
+      alert("Pro export do dokumentů nejdříve připoj svůj Google účet.");
+      return;
+    }
+    if (!generatedPoem) return;
+    setIsExportingDoc(true);
+    setExportedDocUrl('');
+    try {
+      const docTitle = `Sladká báseň pro Michaelku (${new Date().toLocaleDateString('cs-CZ')})`;
+      const result = await createGoogleDocWithContent(googleToken, docTitle, generatedPoem);
+      if (result && result.url) {
+        setExportedDocUrl(result.url);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Nepodařilo se vytvořit dokument v Google Docs.");
+    } finally {
+      setIsExportingDoc(false);
+    }
+  };
+
+  // ---- GOOGLE CONTACTS INTEGRATION (PEOPLE API) ----
+  const handleFetchContacts = async () => {
+    if (!googleToken) {
+      alert("Pro výběr z kontaktů Google nejdříve propoj svůj účet.");
+      return;
+    }
+    setIsLoadingContacts(true);
+    setContactsList([]);
+    setShowContactsModal(true);
+    try {
+      const contacts = await fetchGoogleContacts(googleToken);
+      setContactsList(contacts);
+    } catch (err) {
+      console.error(err);
+      alert("Chyba při synchronizaci kontaktů.");
+    } finally {
+      setIsLoadingContacts(false);
+    }
+  };
+
+  const handleSelectPartnerFromContacts = (contact: any) => {
+    if (!contact) return;
+    setPartnerName(contact.name);
+    setShowContactsModal(false);
+    alert(`Tvá partnerka Michaelka byla propojena s Google kontaktem: ${contact.name}! 🌸`);
+  };
+
+  // ---- GOOGLE CHAT MESSAGE BROADCASTER ----
+  const handleOpenChatModal = async (initialText: string) => {
+    if (!googleToken) {
+      alert("Pro odeslání na Google Chat nejdříve propoj svůj účet.");
+      return;
+    }
+    setTextToSendToChat(initialText);
+    setChatSpaces([]);
+    setSelectedChatSpace('');
+    setChatSendSuccess(false);
+    setChatError('');
+    setShowChatModal(true);
+    try {
+      const spaces = await fetchGoogleChatSpaces(googleToken);
+      setChatSpaces(spaces);
+      if (spaces.length > 0) {
+        setSelectedChatSpace(spaces[0].name);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handlePostToChat = async () => {
+    if (!googleToken || !selectedChatSpace || !textToSendToChat) return;
+    try {
+      await postMessageToGoogleChat(googleToken, selectedChatSpace, textToSendToChat);
+      setChatSendSuccess(true);
+      setTimeout(() => {
+        setChatSendSuccess(false);
+        setShowChatModal(false);
+      }, 1500);
+    } catch (e: any) {
+      setChatError(e.message || "Nepodařilo se poslat zprávu do Google Chat.");
+    }
+  };
+
+  // ---- GOOGLE CALENDAR STREAM IMPORTER ----
+  const handleOpenCalendarImport = async () => {
+    if (!googleToken) {
+      alert("Pro nahrání událostí připoj Google účet.");
+      return;
+    }
+    setIsLoadingEvents(true);
+    setExternalCalendarEvents([]);
+    setShowCalendarModal(true);
+    try {
+      const events = await fetchGoogleCalendarEvents(googleToken);
+      const mapped = events.map((ev: any) => ({
+        id: ev.id,
+        summary: ev.summary || "Zamilovaná schůzka",
+        description: ev.description || "",
+        date: ev.start?.dateTime ? ev.start.dateTime.split('T')[0] : ev.start?.date || "",
+      })).filter((ev: any) => ev.date !== "");
+      setExternalCalendarEvents(mapped);
+    } catch (err) {
+      console.error(err);
+      alert("Nebylo možné získat události z Google Kalendáře.");
+    } finally {
+      setIsLoadingEvents(false);
+    }
+  };
+
+  const handleImportCalendarEventToMilestones = async (ev: any) => {
+    const newMiles: Milestone = {
+      id: generateId(`miles_cal_${ev.id}`),
+      date: ev.date,
+      title: ev.summary,
+      description: ev.description || "Importováno z mých Google kalendářů.",
+      emoji: "📅"
+    };
+
+    if (currentUser) {
+      try {
+        await setDoc(doc(db, 'milestones', newMiles.id), newMiles);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `milestones/${newMiles.id}`);
+      }
+    } else {
+      const updated = [newMiles, ...milestones].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setMilestones(updated);
+      saveState('love_milestones', updated);
+    }
+    alert(`Úspěšně přidáno: "${ev.summary}"! 🎉`);
   };
 
 
@@ -910,41 +1398,137 @@ export default function RomanceApp() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="w-full mt-2 bg-white text-gray-800 rounded-xl p-3 shadow-inner text-xs border border-[#E5E5EA] flex flex-col gap-2 origin-top"
+              className="w-full mt-2 bg-white text-gray-800 rounded-2xl p-4 shadow-inner text-xs border border-[#E5E5EA] flex flex-col gap-3 origin-top"
               id="sync-card"
             >
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-[#FF2D55] flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 fill-[#FF2D55]" /> Naše cloudová synchronizace
-                </span>
-                <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100 font-semibold">
-                  Aktivní a spárováno
-                </span>
+              {/* Part 1: Real-time Firebase Sync Status */}
+              <div className="flex flex-col gap-1 pb-3 border-b border-gray-150">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-[#FF2D55] flex items-center gap-1.5 text-xs">
+                    <CloudLightning className="w-4 h-4 text-[#FF2D55]" />
+                    Příběh v Cloudu (Firebase)
+                  </span>
+                  {currentUser ? (
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100 font-semibold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                      Synchronizováno
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 font-semibold">
+                      Lokální režim
+                    </span>
+                  )}
+                </div>
+                
+                {currentUser ? (
+                  <div className="flex flex-col gap-2 mt-1">
+                    <div className="flex items-center gap-2 bg-[#F2F2F7] p-2 rounded-xl">
+                      {currentUser.photoURL ? (
+                        <img 
+                          src={currentUser.photoURL} 
+                          alt={currentUser.displayName || "Google"} 
+                          className="w-8 h-8 rounded-full border border-white"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-rose-100 text-[#FF2D55] flex items-center justify-center font-bold">
+                          {currentUser.displayName?.charAt(0) || 'U'}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-850 truncate">{currentUser.displayName}</p>
+                        <p className="text-[9px] text-gray-500 truncate">{currentUser.email}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleGoogleDisconnect}
+                        className="text-gray-400 hover:text-red-500 p-1.5 transition-colors"
+                        title="Odpojit účet Google"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Google Workspace Feature Center inside sync dropdown */}
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={handleFetchContacts}
+                        className="flex items-center justify-center gap-1 py-1.5 bg-[#FFF1F2] hover:bg-[#FFE4E6] text-[#FF2D55] rounded-lg transition-all font-semibold border border-rose-100"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Propojit Míšu</span>
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={handleBackupToDrive}
+                        disabled={isBackingUpDrive}
+                        className="flex items-center justify-center gap-1 py-1.5 bg-[#F2F2F7] hover:bg-gray-200 text-gray-750 rounded-lg transition-all font-semibold border border-gray-200"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{isBackingUpDrive ? "Zálohování..." : "Záloha na Disk"}</span>
+                      </button>
+                    </div>
+
+                    {backupSuccess && (
+                      <p className="text-[10px] text-center text-emerald-650 font-semibold animate-pulse mt-1">
+                        ✓ Záloha deníku odeslána na tvůj Google Disk! 📄
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 mt-1">
+                    <p className="text-gray-500 leading-relaxed text-[11px] font-sans">
+                      Připoj se pomocí Google a ulož si všechny vaše společné fotky, vzkazy a přání v reálném čase do bezpečného partnerského cloudu!
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleGoogleConnect}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-white border border-[#D1D1D6] hover:bg-gray-50 text-gray-700 rounded-xl transition-all font-bold shadow-2xs cursor-pointer"
+                    >
+                      <svg className="w-4 h-4 ml-1" viewBox="0 0 24 24" width="24" height="24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                      </svg>
+                      <span>Přihlásit se přes Google</span>
+                    </button>
+                  </div>
+                )}
               </div>
-              <p className="text-gray-500 leading-relaxed font-sans">
-                Zařízení jsou propojena kódem <strong className="text-gray-900 font-mono tracking-wider">{relationshipCode}</strong>. Jakákoliv fotka či vzkaz se okamžitě zobrazí i Michaelce.
-              </p>
-              <div className="flex gap-2 items-center mt-1">
-                <input
-                  type="text"
-                  placeholder="Zadej kód od Michaelky..."
-                  className="bg-[#F2F2F7] border border-[#E5E5EA] px-3 py-1.5 rounded-lg flex-1 text-xs focus:outline-hidden focus:ring-1 focus:ring-[#FF2D55] font-mono text-gray-800"
-                  value={syncCodeInput}
-                  onChange={(e) => setSyncCodeInput(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (syncCodeInput.trim().length > 3) {
-                      setRelationshipCode(syncCodeInput.trim().toUpperCase());
-                      setSyncCodeInput('');
-                      alert("Váš láskyplný prostor byl úspěšně synchronizován a propojen! 💖");
-                    }
-                  }}
-                  className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white px-3 py-1.5 rounded-lg font-bold transition-all text-xs shadow-xs"
-                >
-                  Propojit
-                </button>
+
+              {/* Part 2: Manual Code space sync */}
+              <div className="flex flex-col gap-1.5 pt-1">
+                <div className="flex justify-between items-center text-[10px] text-gray-500">
+                  <span className="font-semibold text-gray-700">Ruční párovací kód</span>
+                  <span className="font-mono bg-gray-100 text-gray-650 px-1.5 py-0.5 rounded-sm">
+                    {relationshipCode}
+                  </span>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Zadej kód od partnera..."
+                    className="bg-[#F2F2F7] border border-[#E5E5EA] px-3 py-1.5 rounded-lg flex-1 text-xs focus:outline-hidden focus:ring-1 focus:ring-[#FF2D55] font-mono text-gray-800"
+                    value={syncCodeInput}
+                    onChange={(e) => setSyncCodeInput(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (syncCodeInput.trim().length > 3) {
+                        setRelationshipCode(syncCodeInput.trim().toUpperCase());
+                        setSyncCodeInput('');
+                        alert("Partnerský kód byl uložen! 💖");
+                      }
+                    }}
+                    className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white px-3 py-1.5 rounded-lg font-bold transition-all text-xs cursor-pointer"
+                  >
+                    Uložit
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1257,6 +1841,47 @@ export default function RomanceApp() {
                             </>
                           )}
                         </button>
+                      </div>
+
+                      {/* Google Workspace actions */}
+                      <div className="flex flex-col gap-2 mt-1 pt-3 border-t border-dashed border-gray-150" id="google-workspace-poem-actions">
+                        {googleToken ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={handleExportPoemToDocs}
+                              disabled={isExportingDoc}
+                              className="bg-sky-50 hover:bg-sky-100 border border-sky-150 py-2.5 rounded-[12px] text-[11px] font-bold text-sky-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-sky-500" />
+                              <span>{isExportingDoc ? "Ukládání..." : "Do Google Docs"}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenChatModal(`💞 Ahoj miláčku! Posílám ti zamilovanou báseň od našeho AI básníka:\n\n${generatedPoem}`)}
+                              className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-150 py-2.5 rounded-[12px] text-[11px] font-bold text-emerald-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5 text-emerald-500" />
+                              <span>Poslat na Chat</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-gray-400 text-center font-medium font-sans">
+                            Propoj Google účet nahoře pro export do Google Docs a zasílání na Google Chat! ❤️
+                          </p>
+                        )}
+
+                        {exportedDocUrl && (
+                          <a 
+                            href={exportedDocUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-[10px] text-sky-600 hover:underline font-bold bg-sky-50/50 py-1 px-2 rounded-md border border-sky-100 inline-block text-center flex items-center justify-center gap-1"
+                          >
+                            <span>Otevřít vytvořenou báseň v Google Docs ↗</span>
+                          </a>
+                        )}
                       </div>
 
                       {saveSuccess && (
@@ -1595,6 +2220,22 @@ export default function RomanceApp() {
                         </span>
 
                         <div className="flex items-center gap-1.5">
+                          {/* Google Chat send button */}
+                          {googleToken && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenChatModal(`💌 Vzkaz z Deníku:\n\n"${n.text}"\n\n— autor: ${n.author}`)}
+                              className={`p-1 rounded-md transition-colors ${
+                                n.isPinned
+                                  ? 'text-white hover:bg-white/10'
+                                  : 'text-[#8E8E93] hover:text-emerald-500 hover:bg-gray-100'
+                              }`}
+                              title="Poslat na Google Chat"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
                           {/* Pin function */}
                           <button
                             type="button"
@@ -1670,7 +2311,6 @@ export default function RomanceApp() {
                 className="flex flex-col gap-5"
                 id="timeline-tab"
               >
-                
                 {/* Milestone Intro header with ADD action buttons */}
                 <div className="bg-white rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#E5E5EA] flex flex-col gap-3" id="milestones-card-header">
                   <div className="flex justify-between items-start">
@@ -1681,7 +2321,7 @@ export default function RomanceApp() {
                     <button
                       type="button"
                       onClick={() => setShowAddMilestone(!showAddMilestone)}
-                      className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white font-bold p-2.5 rounded-full transition-all shadow-[0_4px_12px_rgba(255,45,85,0.2)] shrink-0 flex items-center justify-center"
+                      className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white font-bold p-2.5 rounded-full transition-all shadow-[0_4px_12px_rgba(255,45,85,0.2)] shrink-0 flex items-center justify-center cursor-pointer"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -1689,6 +2329,17 @@ export default function RomanceApp() {
                   <p className="text-[10px] text-[#8E8E93] leading-normal">
                     Zaznamenáváme sem všechny drahocenné vzpomínky, výlety, výročí a události, které nás udělaly šťastnými. Každému dnu přisuzujeme vlastní barvu a emoji!
                   </p>
+
+                  {googleToken && (
+                    <button
+                      type="button"
+                      onClick={handleOpenCalendarImport}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold rounded-xl text-[11px] border border-sky-100/50 transition-all cursor-pointer mt-1"
+                    >
+                      <CalendarDays className="w-4 h-4 text-sky-500" />
+                      <span>Importovat události z Google Kalendáře</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Add milestone Modal inside state */}
@@ -1755,18 +2406,30 @@ export default function RomanceApp() {
                       </div>
                     </div>
 
+                    {googleToken && (
+                      <label className="flex items-center gap-2 text-[11px] text-gray-650 bg-[#F2F2F7] px-3 py-2 rounded-xl border border-gray-150 cursor-pointer my-0.5">
+                        <input
+                          type="checkbox"
+                          checked={addToGoogleCalendarChecked}
+                          onChange={(e) => setAddToGoogleCalendarChecked(e.target.checked)}
+                          className="accent-[#FF2D55] w-3.5 h-3.5 rounded-sm focus:ring-0"
+                        />
+                        <span className="font-semibold text-gray-700">Publikovat do mého Google Kalendáře</span>
+                      </label>
+                    )}
+
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => setShowAddMilestone(false)}
-                        className="bg-[#F2F2F7] hover:bg-[#F2F2F7]/85 text-gray-600 px-4 py-2 rounded-[12px] text-xs font-bold transition-all border border-[#E5E5EA] flex-1"
+                        className="bg-[#F2F2F7] hover:bg-[#F2F2F7]/85 text-gray-600 px-4 py-2 rounded-[12px] text-xs font-bold transition-all border border-[#E5E5EA] flex-1 cursor-pointer"
                       >
                         Zrušit
                       </button>
                       <button
                         type="button"
                         onClick={addMilestone}
-                        className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white px-4 py-2 rounded-[12px] text-xs font-bold transition-all shadow-xs flex-1"
+                        className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white px-4 py-2 rounded-[12px] text-xs font-bold transition-all shadow-xs flex-1 cursor-pointer"
                       >
                         Uložit do kalendáře
                       </button>

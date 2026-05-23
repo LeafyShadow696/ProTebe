@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Entity validation helpers
+    function isValidPhoto(p) {
+      return p.keys().hasAll(['id', 'url', 'caption', 'date', 'isFavorite'])
+        && p.keys().size() == 5
+        && p.id is string && p.id.size() <= 128
+        && p.url is string && p.url.size() <= 2048
+        && p.caption is string && p.caption.size() <= 1000
+        && p.date is string && p.date.size() <= 32
+        && p.isFavorite is bool;
+    }
+
+    function isValidNote(n) {
+      return n.keys().hasAll(['id', 'text', 'author', 'date', 'isPinned', 'reactions'])
+        && n.keys().size() == 6
+        && n.id is string && n.id.size() <= 128
+        && n.text is string && n.text.size() <= 5000
+        && n.author is string && n.author.size() <= 128
+        && n.date is string && n.date.size() <= 64
+        && n.isPinned is bool
+        && n.reactions is map;
+    }
+
+    function isValidMilestone(m) {
+      return m.keys().hasAll(['id', 'date', 'title', 'description', 'emoji'])
+        && m.keys().size() == 5
+        && m.id is string && m.id.size() <= 128
+        && m.date is string && m.date.size() <= 32
+        && m.title is string && m.title.size() <= 200
+        && m.description is string && m.description.size() <= 2000
+        && m.emoji is string && m.emoji.size() <= 16;
+    }
+
+    // Paths matching collections
+    match /photos/{photoId} {
+      allow get: if isEmailVerified();
+      allow list: if isEmailVerified();
+      
+      allow create: if isEmailVerified() 
+        && isValidId(photoId) 
+        && request.resource.data.id == photoId
+        && isValidPhoto(request.resource.data);
+
+      allow update: if isEmailVerified() 
+        && isValidId(photoId) 
+        && request.resource.data.id == photoId
+        && isValidPhoto(request.resource.data)
+        && (
+          // Allow toggle favorite state or full photo details update
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isFavorite']) ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['caption', 'date', 'isFavorite', 'url'])
+        );
+
+      allow delete: if isEmailVerified() && isValidId(photoId);
+    }
+
+    match /notes/{noteId} {
+      allow get: if isEmailVerified();
+      allow list: if isEmailVerified();
+      
+      allow create: if isEmailVerified() 
+        && isValidId(noteId) 
+        && request.resource.data.id == noteId
+        && isValidNote(request.resource.data);
+
+      allow update: if isEmailVerified() 
+        && isValidId(noteId) 
+        && request.resource.data.id == noteId
+        && isValidNote(request.resource.data)
+        && (
+          // Action: Pin / Unpin Note
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPinned']) ||
+          // Action: React To Note
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']) ||
+          // Action: General edit of note text/author
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'author', 'reactions', 'isPinned'])
+        );
+
+      allow delete: if isEmailVerified() && isValidId(noteId);
+    }
+
+    match /milestones/{milestoneId} {
+      allow get: if isEmailVerified();
+      allow list: if isEmailVerified();
+      
+      allow create: if isEmailVerified() 
+        && isValidId(milestoneId) 
+        && request.resource.data.id == milestoneId
+        && isValidMilestone(request.resource.data);
+
+      allow update: if isEmailVerified() 
+        && isValidId(milestoneId) 
+        && request.resource.data.id == milestoneId
+        && isValidMilestone(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'emoji', 'date']);
+
+      allow delete: if isEmailVerified() && isValidId(milestoneId);
+    }
+  }
+}
