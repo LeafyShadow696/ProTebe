@@ -1,0 +1,6 @@
+{
+  "name": "Srdce pro Michaelku",
+  "description": "Exkluzivní iOS-style prostor pro Michaelku. Počítadlo lásky od 3.4.2026, vzpomínková galerie, vzkazy, společný kalendář a AI tvorba zamilovaných básní.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
