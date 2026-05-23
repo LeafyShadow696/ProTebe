@@ -32,7 +32,9 @@ import {
   LogIn,
   LogOut,
   Loader2,
-  ArrowRight
+  ArrowRight,
+  MapPin,
+  Menu
 } from 'lucide-react';
 
 import { initAuth, googleSignIn, logout as googleLogout } from '../lib/googleAuth';
@@ -54,7 +56,9 @@ enum Tab {
   GALLERY = 'GALLERY',
   MESSAGE_BOARD = 'MESSAGE_BOARD',
   TIMELINE = 'TIMELINE',
-  WORKSPACE = 'WORKSPACE'
+  WORKSPACE = 'WORKSPACE',
+  PLACES = 'PLACES',
+  MORE = 'MORE'
 }
 
 // Milestone Interface
@@ -73,6 +77,17 @@ interface Photo {
   caption: string;
   date: string;
   isFavorite: boolean;
+}
+
+// Special Place Interface
+interface SpecialPlace {
+  id: string;
+  title: string;
+  address: string;
+  description: string;
+  date: string;
+  emoji: string;
+  author: 'boyfriend' | 'girlfriend' | 'both';
 }
 
 // Note Interface
@@ -134,7 +149,12 @@ export default function RomanceApp() {
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
   // Docs state
-  const [journalDocId, setJournalDocId] = useState<string>('');
+  const [journalDocId, setJournalDocId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('love_journal_doc_id') || '';
+    }
+    return '';
+  });
   const [journalContent, setJournalContent] = useState<string>('');
   const [isJournalLoading, setIsJournalLoading] = useState<boolean>(false);
   const [newJournalText, setNewJournalText] = useState<string>('');
@@ -166,20 +186,8 @@ export default function RomanceApp() {
   // Input state for linking existing Doc URLs
   const [linkDocInput, setLinkDocInput] = useState<string>('');
 
-  // Auto-fill email recipient based on role
-  useEffect(() => {
-    setPartnerEmail(userRole === 'boyfriend' ? 'leafyshadow.696@gmail.com' : 'leafyshadow.696@gmail.com');
-  }, [userRole]);
-
   // Load / listen Auth state and saved Doc ID
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedDocId = localStorage.getItem('love_journal_doc_id');
-      if (savedDocId) {
-        setJournalDocId(savedDocId);
-      }
-    }
-
     const unsubscribe = initAuth(
       (user, token) => {
         setGoogleUser(user);
@@ -208,7 +216,7 @@ export default function RomanceApp() {
     }
   }, [googleToken, journalDocId]);
 
-  const loadDocsContent = async (docId: string) => {
+  async function loadDocsContent(docId: string) {
     if (!googleToken || !docId) return;
     setIsJournalLoading(true);
     setDocsStatus('');
@@ -221,7 +229,7 @@ export default function RomanceApp() {
     } finally {
       setIsJournalLoading(false);
     }
-  };
+  }
 
   const handleCreateJournal = async () => {
     if (!googleToken) return;
@@ -296,7 +304,7 @@ export default function RomanceApp() {
     }
   };
 
-  const loadGmailLoveLetters = async () => {
+  async function loadGmailLoveLetters() {
     if (!googleToken) return;
     setIsLettersLoading(true);
     try {
@@ -307,7 +315,7 @@ export default function RomanceApp() {
     } finally {
       setIsLettersLoading(false);
     }
-  };
+  }
 
   const handleSendLoveLetter = async () => {
     if (!googleToken || !partnerEmail.trim() || !emailMessage.trim()) return;
@@ -378,7 +386,7 @@ export default function RomanceApp() {
     }
   };
 
-  const loadChatSpaces = async () => {
+  async function loadChatSpaces() {
     if (!googleToken) return;
     setIsChatSpacesLoading(true);
     try {
@@ -394,7 +402,7 @@ export default function RomanceApp() {
     } finally {
       setIsChatSpacesLoading(false);
     }
-  };
+  }
 
   const handleSendChatMessage = async (presetText?: string) => {
     const messageToSend = presetText || customChatMessage;
@@ -463,7 +471,84 @@ export default function RomanceApp() {
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
-  // Gallery State with safe client fallback
+  // Custom Confirm & Alert Dialogs States (Fixes sandbox iframe window.confirm/alert blocks!)
+  interface CustomConfirmConfig {
+    title: string;
+    message: string;
+    confirmText: string;
+    cancelText?: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }
+  const [customConfirm, setCustomConfirm] = useState<CustomConfirmConfig | null>(null);
+  
+  interface CustomAlertConfig {
+    title: string;
+    message: string;
+    icon?: string;
+    onClose?: () => void;
+  }
+  const [customAlert, setCustomAlert] = useState<CustomAlertConfig | null>(null);
+
+  const triggerAlert = (title: string, message: string, icon = '✨') => {
+    setCustomAlert({ title, message, icon });
+  };
+
+  // Naše místa (Special Places) Default Data
+  const DEFAULT_PLACES: SpecialPlace[] = [
+    {
+      id: 'place_1',
+      title: 'První střetnutí očí 👀',
+      address: 'Javorek 54, 592 03 Javorek, Česko',
+      description: 'Zde se poprvé střetly naše cesty a začala se psát naše překrásná společná kapitola života.',
+      date: '2026-04-03',
+      emoji: '✨',
+      author: 'both'
+    },
+    {
+      id: 'place_2',
+      title: 'První oficiální rande ❤️',
+      address: 'Nové Město na Moravě, Česko',
+      description: 'Sladký začátek, výborná káva a nezapomenutelný smích plný roztomilé trémy.',
+      date: '2026-04-18',
+      emoji: '☕️',
+      author: 'boyfriend'
+    },
+    {
+      id: 'place_3',
+      title: 'Naše zamilovaná procházka 🏰',
+      address: 'Zelená hora, Žďár nad Sázavou, Česko',
+      description: 'Nádherná chvíle na památném místě kousek od Žďáru, kde jsme si slíbili naši věrnost a blízkost.',
+      date: '2026-05-01',
+      emoji: '🌸',
+      author: 'girlfriend'
+    }
+  ];
+
+  // Naše místa States
+  const [places, setPlaces] = useState<SpecialPlace[]>(() => {
+    if (typeof window !== 'undefined') {
+      const savedPlaces = localStorage.getItem('love_places');
+      if (savedPlaces) {
+        try {
+          return JSON.parse(savedPlaces);
+        } catch (e) {
+          console.error("Load places error", e);
+        }
+      }
+    }
+    return DEFAULT_PLACES;
+  });
+
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string>('place_1');
+  const [showAddPlace, setShowAddPlace] = useState<boolean>(false);
+  const [newPlaceTitle, setNewPlaceTitle] = useState<string>('');
+  const [newPlaceAddress, setNewPlaceAddress] = useState<string>('');
+  const [newPlaceDescription, setNewPlaceDescription] = useState<string>('');
+  const [newPlaceDate, setNewPlaceDate] = useState<string>('');
+  const [newPlaceEmoji, setNewPlaceEmoji] = useState<string>('📍');
+
+  // Gallery State with safe client fallback (Illustrative photos removed by default)
   const [galleryPhotos, setGalleryPhotos] = useState<Photo[]>(() => {
     if (typeof window !== 'undefined') {
       const savedGallery = localStorage.getItem('love_gallery');
@@ -475,29 +560,7 @@ export default function RomanceApp() {
         }
       }
     }
-    return [
-      {
-        id: 'photo_1',
-        url: 'https://picsum.photos/seed/love1/800/600',
-        caption: 'Náš úplně první den pod sluncem. Chvíle, kdy se zastavil čas.',
-        date: '2026-04-03',
-        isFavorite: true
-      },
-      {
-        id: 'photo_2',
-        url: 'https://picsum.photos/seed/love2/800/600',
-        caption: 'Smích na toulkách lesem. S tebou má každá cesta barvu zlaté.',
-        date: '2026-04-18',
-        isFavorite: false
-      },
-      {
-        id: 'photo_3',
-        url: 'https://picsum.photos/seed/love3/800/600',
-        caption: 'Společná káva pod rozkvetlou třešní – náš První máj. ❤️',
-        date: '2026-05-01',
-        isFavorite: true
-      }
-    ];
+    return []; // Return empty by default as explicitly requested!
   });
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -1035,11 +1098,20 @@ export default function RomanceApp() {
 
   const deletePhoto = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Opravdu chceš smazat tuto vzpomínku z galerie?")) return;
-    const updated = galleryPhotos.filter((p) => p.id !== id);
-    setGalleryPhotos(updated);
-    saveState('love_gallery', updated);
-    setLightboxIndex(null);
+    setCustomConfirm({
+      title: "Smazat vzpomínku? 📸",
+      message: "Opravdu si přeješ nadobro smazat tuto drahocennou vzpomínku z naší společné galerie?",
+      confirmText: "Smazat",
+      cancelText: "Ponechat",
+      isDestructive: true,
+      onConfirm: () => {
+        const updated = galleryPhotos.filter((p) => p.id !== id);
+        setGalleryPhotos(updated);
+        saveState('love_gallery', updated);
+        setLightboxIndex(null);
+        setCustomConfirm(null);
+      }
+    });
   };
 
   const toggleFavoritePhoto = (id: string, e: React.MouseEvent) => {
@@ -1104,10 +1176,19 @@ export default function RomanceApp() {
   };
 
   const deleteNote = (noteId: string) => {
-    if (!confirm("Chceš smazat tento vzkaz?")) return;
-    const updated = notes.filter((n) => n.id !== noteId);
-    setNotes(updated);
-    saveState('love_notes', updated);
+    setCustomConfirm({
+      title: "Smazat vzkaz? 💌",
+      message: "Opravdu chceš smazat tento sladký vzkaz?",
+      confirmText: "Smazat",
+      cancelText: "Ponechat",
+      isDestructive: true,
+      onConfirm: () => {
+        const updated = notes.filter((n) => n.id !== noteId);
+        setNotes(updated);
+        saveState('love_notes', updated);
+        setCustomConfirm(null);
+      }
+    });
   };
 
   const generateAiVzkazPrompt = () => {
@@ -1148,10 +1229,71 @@ export default function RomanceApp() {
   };
 
   const deleteMilestone = (id: string) => {
-    if (!confirm("Smazat tento milník z našeho společného kalendáře?")) return;
-    const updated = milestones.filter((m) => m.id !== id);
-    setMilestones(updated);
-    saveState('love_milestones', updated);
+    setCustomConfirm({
+      title: "Smazat milník? 📅",
+      message: "Opravdu chceš smazat tento krásný milník z vašeho společného kalendáře?",
+      confirmText: "Smazat",
+      cancelText: "Ponechat",
+      isDestructive: true,
+      onConfirm: () => {
+        const updated = milestones.filter((m) => m.id !== id);
+        setMilestones(updated);
+        saveState('love_milestones', updated);
+        setCustomConfirm(null);
+      }
+    });
+  };
+
+  // ---- SPECIÁLNÍ MÍSTA (MEMORABLE PLACES) ACTIONS ----
+  const addSpecialPlace = () => {
+    if (!newPlaceTitle.trim() || !newPlaceAddress.trim()) {
+      triggerAlert("Chyba ⚠️", "Prosím vyplňte název i adresu místa.", "⚠️");
+      return;
+    }
+    const signature = userRole === 'boyfriend' ? 'boyfriend' : 'girlfriend';
+    const newPlace: SpecialPlace = {
+      id: `place_${Date.now()}`,
+      title: newPlaceTitle.trim(),
+      address: newPlaceAddress.trim(),
+      description: newPlaceDescription.trim() || "Krásné vzpomínkové rande nebo společné dobrodružství.",
+      date: newPlaceDate || new Date().toISOString().split('T')[0],
+      emoji: newPlaceEmoji || '📍',
+      author: signature
+    };
+    const updated = [newPlace, ...places];
+    setPlaces(updated);
+    saveState('love_places', updated);
+    setSelectedPlaceId(newPlace.id);
+    
+    // Reset fields
+    setNewPlaceTitle('');
+    setNewPlaceAddress('');
+    setNewPlaceDescription('');
+    setNewPlaceDate('');
+    setNewPlaceEmoji('📍');
+    setShowAddPlace(false);
+    
+    triggerAlert("Místo uloženo! 🎉", `Misto "${newPlace.title}" bylo úspěšně přidáno na vaši mapu.`, "💖");
+  };
+
+  const deleteSpecialPlace = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCustomConfirm({
+      title: "Smazat místo? 📍",
+      message: "Opravdu si přeješ smazat toto památné místo z vaší společné mapy?",
+      confirmText: "Smazat",
+      cancelText: "Ponechat",
+      isDestructive: true,
+      onConfirm: () => {
+        const updated = places.filter((p) => p.id !== id);
+        setPlaces(updated);
+        saveState('love_places', updated);
+        if (selectedPlaceId === id && updated.length > 0) {
+          setSelectedPlaceId(updated[0].id);
+        }
+        setCustomConfirm(null);
+      }
+    });
   };
 
 
@@ -1703,129 +1845,136 @@ export default function RomanceApp() {
                 </div>
 
                 {/* Grid container photos (3 columns just like native iOS) */}
-                {galleryPhotos.filter(p => galleryFilter === 'all' || p.isFavorite).length === 0 ? (
-                  <div className="bg-white rounded-[24px] py-12 px-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#E5E5EA] flex flex-col items-center text-center text-gray-400 gap-2">
-                    <ImageIcon className="w-10 h-10 text-[#FF2D55]/40" />
-                    <span className="text-xs text-gray-600 font-semibold">Zatím tu nemáte žádné fotky.</span>
-                    <span className="text-[10px] text-[#8E8E93]">Nahrajte první vzpomínku s Michaelkou přes tlačítko výše!</span>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3" id="photos-grid">
-                    {galleryPhotos
-                      .filter((p) => galleryFilter === 'all' || p.isFavorite)
-                      .map((p, index) => (
-                        <div
-                          key={p.id}
-                          className="bg-white rounded-[16px] overflow-hidden border border-[#E5E5EA] shadow-2xs cursor-pointer group hover:shadow-sm transition-all relative flex flex-col justify-between"
-                          onClick={() => setLightboxIndex(index)}
-                        >
-                          <div className="relative aspect-square overflow-hidden bg-[#F2F2F7] flex items-center justify-center">
-                            {/* Native referrer check applied according to guidelines */}
-                            <img
-                              src={p.url}
-                              alt={p.caption}
-                              referrerPolicy="no-referrer"
-                              className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
-                            />
+                {(() => {
+                  const filteredPhotos = galleryPhotos.filter((p) => galleryFilter === 'all' || p.isFavorite);
+                  if (filteredPhotos.length === 0) {
+                    return (
+                      <div className="bg-white rounded-[24px] py-12 px-4 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#E5E5EA] flex flex-col items-center text-center text-gray-400 gap-2">
+                        <ImageIcon className="w-10 h-10 text-[#FF2D55]/40 animate-pulse" />
+                        <span className="text-xs text-gray-600 font-semibold">Zatím tu nemáte žádné fotky.</span>
+                        <span className="text-[10px] text-[#8E8E93]">Nahrejte první drahocennou vzpomínku přes formulář výše!</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-3" id="photos-grid">
+                        {filteredPhotos.map((p, index) => (
+                          <div
+                            key={p.id}
+                            className="bg-white rounded-[16px] overflow-hidden border border-[#E5E5EA] shadow-2xs cursor-pointer group hover:shadow-sm transition-all relative flex flex-col justify-between"
+                            onClick={() => setLightboxIndex(index)}
+                          >
+                            <div className="relative aspect-square overflow-hidden bg-[#F2F2F7] flex items-center justify-center">
+                              {/* Native referrer check applied according to guidelines */}
+                              <img
+                                src={p.url}
+                                alt={p.caption}
+                                referrerPolicy="no-referrer"
+                                className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
+                              />
 
+                              <button
+                                type="button"
+                                onClick={(e) => toggleFavoritePhoto(p.id, e)}
+                                className="absolute top-2 right-2 bg-black/35 backdrop-blur-md p-1.5 rounded-full z-10 hover:bg-black/55 transition-all text-white hover:scale-105"
+                              >
+                                <Star
+                                  className={`w-3.5 h-3.5 ${p.isFavorite ? 'text-amber-400 fill-amber-400' : 'text-white'}`}
+                                />
+                              </button>
+                            </div>
+
+                            {/* Mini Caption */}
+                            <div className="p-3 bg-white flex flex-col gap-1">
+                              <span className="text-[9px] font-mono text-[#8E8E93] flex items-center gap-1">
+                                <CalendarIcon className="w-2.5 h-2.5" /> {p.date}
+                              </span>
+                              <p className="text-[10px] text-gray-700 font-semibold truncate leading-tight">
+                                {p.caption}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* iOS Photo Lightbox / Fullscreen Modal */}
+                      {lightboxIndex !== null && filteredPhotos[lightboxIndex] && (
+                        <div className="fixed inset-0 bg-black/95 backdrop-blur-lg z-[100] flex flex-col justify-between" id="photo-lightbox">
+                          {/* Lightbox header bar */}
+                          <div className="flex justify-between items-center px-6 py-4 text-white shrink-0 mt-6">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-mono text-gray-400">{filteredPhotos[lightboxIndex]?.date}</span>
+                              <span className="text-[10px] text-[#FF2D55] font-bold">Náš společný moment ❤️</span>
+                            </div>
                             <button
                               type="button"
-                              onClick={(e) => toggleFavoritePhoto(p.id, e)}
-                              className="absolute top-2 right-2 bg-black/35 backdrop-blur-md p-1.5 rounded-full z-10 hover:bg-black/55 transition-all text-white hover:scale-105"
+                              onClick={() => setLightboxIndex(null)}
+                              className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all text-white border border-white/10"
                             >
-                              <Star
-                                className={`w-3.5 h-3.5 ${p.isFavorite ? 'text-amber-400 fill-amber-400' : 'text-white'}`}
-                              />
+                              <X className="w-5 h-5" />
                             </button>
                           </div>
 
-                          {/* Mini Caption */}
-                          <div className="p-3 bg-white flex flex-col gap-1">
-                            <span className="text-[9px] font-mono text-[#8E8E93] flex items-center gap-1">
-                              <CalendarIcon className="w-2.5 h-2.5" /> {p.date}
-                            </span>
-                            <p className="text-[10px] text-gray-700 font-semibold truncate leading-tight">
-                              {p.caption}
+                          {/* Central Image container */}
+                          <div className="flex-1 flex items-center justify-center p-3 relative" id="lightbox-center-container">
+                            <button
+                              type="button"
+                              onClick={() => setLightboxIndex(lightboxIndex > 0 ? lightboxIndex - 1 : filteredPhotos.length - 1)}
+                              className="absolute left-6 text-white/50 hover:text-white p-2 z-10 bg-black/20 rounded-full"
+                            >
+                              <ChevronLeft className="w-8 h-8" />
+                            </button>
+
+                            <div className="max-w-md max-h-[480px] w-full h-full relative flex items-center justify-center">
+                              <img
+                                src={filteredPhotos[lightboxIndex]?.url}
+                                alt={filteredPhotos[lightboxIndex]?.caption}
+                                className="object-contain max-h-[480px] max-w-full rounded-lg shadow-2xl"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setLightboxIndex(lightboxIndex < filteredPhotos.length - 1 ? lightboxIndex + 1 : 0)}
+                              className="absolute right-6 text-white/50 hover:text-white p-2 z-10 bg-black/20 rounded-full"
+                            >
+                              <ChevronRight className="w-8 h-8" />
+                            </button>
+                          </div>
+
+                          {/* Detail footer and captions with delete actions */}
+                          <div className="bg-black/60 backdrop-blur-md px-6 py-6 pb-12 flex flex-col gap-4 text-white shrink-0">
+                            <p className="text-xs text-center border-l-2 border-[#FF2D55] pl-3 leading-relaxed max-w-sm mx-auto">
+                              &ldquo;{filteredPhotos[lightboxIndex]?.caption}&rdquo;
                             </p>
+                            <div className="flex justify-between items-center border-t border-white/10 pt-4 max-w-sm mx-auto w-full text-xs">
+                              <button
+                                type="button"
+                                onClick={(e) => toggleFavoritePhoto(filteredPhotos[lightboxIndex].id, e)}
+                                className="flex items-center gap-1 text-white hover:text-[#FF2D55] transition-colors"
+                              >
+                                <Star className={`w-4 h-4 ${filteredPhotos[lightboxIndex]?.isFavorite ? 'text-amber-400 fill-amber-300' : ''}`} />
+                                <span>{filteredPhotos[lightboxIndex]?.isFavorite ? 'Odebrat z oblíbených' : 'Přidat k oblíbeným'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => deletePhoto(filteredPhotos[lightboxIndex].id, e)}
+                                className="flex items-center gap-1 text-[#FF2D55] hover:text-[#FF2D55]/80 transition-colors font-bold"
+                                title="Smazat vzpomínku"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span>Smazat</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      ))}
-                  </div>
-                )}
-
-                {/* iOS Photo Lightbox / Fullscreen Modal */}
-                {lightboxIndex !== null && (
-                  <div className="fixed inset-0 bg-black/95 backdrop-blur-lg z-50 flex flex-col justify-between" id="photo-lightbox">
-                    {/* Lightbox header bar */}
-                    <div className="flex justify-between items-center px-6 py-4 text-white shrink-0 mt-6">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-mono text-gray-400">{galleryPhotos[lightboxIndex]?.date}</span>
-                        <span className="text-[10px] text-[#FF2D55] font-bold">Vzpomínka princezny Beru</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setLightboxIndex(null)}
-                        className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all text-white border border-white/10"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-
-                    {/* Central Image container */}
-                    <div className="flex-1 flex items-center justify-center p-3 relative" id="lightbox-center-container">
-                      <button
-                        type="button"
-                        onClick={() => setLightboxIndex(lightboxIndex > 0 ? lightboxIndex - 1 : galleryPhotos.length - 1)}
-                        className="absolute left-6 text-white/50 hover:text-white p-2"
-                      >
-                        <ChevronLeft className="w-8 h-8" />
-                      </button>
-
-                      <div className="max-w-md max-h-[480px] w-full h-full relative flex items-center justify-center">
-                        <img
-                          src={galleryPhotos[lightboxIndex]?.url}
-                          alt={galleryPhotos[lightboxIndex]?.caption}
-                          className="object-contain max-h-[480px] max-w-full rounded-lg shadow-2xl"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setLightboxIndex(lightboxIndex < galleryPhotos.length - 1 ? lightboxIndex + 1 : 0)}
-                        className="absolute right-6 text-white/50 hover:text-white p-2"
-                      >
-                        <ChevronRight className="w-8 h-8" />
-                      </button>
-                    </div>
-
-                    {/* Detail footer and captions with delete actions */}
-                    <div className="bg-black/40 backdrop-blur-md px-6 py-6 pb-12 flex flex-col gap-4 text-white shrink-0">
-                      <p className="text-xs text-center border-l-2 border-[#FF2D55] pl-3 leading-relaxed max-w-sm mx-auto">
-                        &ldquo;{galleryPhotos[lightboxIndex]?.caption}&rdquo;
-                      </p>
-                      <div className="flex justify-between items-center border-t border-white/10 pt-4 max-w-sm mx-auto w-full text-xs">
-                        <button
-                          type="button"
-                          onClick={(e) => toggleFavoritePhoto(galleryPhotos[lightboxIndex].id, e)}
-                          className="flex items-center gap-1 text-white hover:text-[#FF2D55] transition-colors"
-                        >
-                          <Star className={`w-4 h-4 ${galleryPhotos[lightboxIndex]?.isFavorite ? 'text-amber-400 fill-amber-300' : ''}`} />
-                          <span>{galleryPhotos[lightboxIndex]?.isFavorite ? 'Zařazeno v oblíbených' : 'Přidat k oblíbeným'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => deletePhoto(galleryPhotos[lightboxIndex].id, e)}
-                          className="flex items-center gap-1 text-[#FF2D55] hover:text-[#FF2D55]/80 transition-colors font-bold"
-                          title="Smazat vzpomínku"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span>Smazat</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                      )}
+                    </>
+                  );
+                })()}
               </motion.div>
             )}
 
@@ -2151,74 +2300,728 @@ export default function RomanceApp() {
 
               </motion.div>
             )}
+
+            {activeTab === Tab.PLACES && (
+              <motion.div
+                key="places"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.25 }}
+                className="flex flex-col gap-5 pb-8"
+                id="places-tab"
+              >
+                {/* Header */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wider text-[#FF2D55] font-bold">Zamilovaná mapa</span>
+                  <h3 className="font-sans text-gray-900 font-extrabold text-xl">Naše místa rande 📍</h3>
+                  <p className="text-xs text-[#8E8E93] leading-relaxed">
+                    Uchováváme a mapujeme místa, která pro nás znamenají celý svět!
+                  </p>
+                </div>
+
+                {/* Google Map Embedded Frame */}
+                {(() => {
+                  const currentPlace = places.find(p => p.id === selectedPlaceId) || places[0];
+                  const mapEmbedUrl = currentPlace 
+                    ? `https://maps.google.com/maps?q=${encodeURIComponent(currentPlace.address)}&t=&z=14&ie=UTF8&iwloc=&output=embed`
+                    : '';
+                  
+                  return (
+                    <div className="bg-white rounded-[24px] p-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#E5E5EA]" id="map-container">
+                      <div className="relative rounded-[18px] overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-100 h-[220px]">
+                        {mapEmbedUrl ? (
+                          <iframe
+                            src={mapEmbedUrl}
+                            width="100%"
+                            height="100%"
+                            style={{ border: 0 }}
+                            allowFullScreen={false}
+                            loading="lazy"
+                            title="Interactive Maps"
+                            id="google-maps"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="text-xs text-gray-400 p-4 text-center">Vyberte rande z listu pro zobrazení mapy</div>
+                        )}
+                      </div>
+                      {currentPlace && (
+                        <div className="p-3 pb-2 flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base">{currentPlace.emoji}</span>
+                            <span className="font-extrabold text-xs text-gray-900 truncate">{currentPlace.title}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-[#8E8E93] block truncate">{currentPlace.address}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Add Memorize Place form trigger / form */}
+                <div className="flex flex-col gap-3">
+                  {!showAddPlace ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddPlace(true)}
+                      className="bg-white hover:bg-gray-50 text-gray-750 font-bold py-3 px-4 rounded-[16px] text-xs border border-[#E5E5EA] shadow-2xs transition-all flex items-center justify-center gap-2"
+                    >
+                      <Plus className="w-4 h-4 text-[#FF2D55]" />
+                      <span>Zaznamenat další naše rande</span>
+                    </button>
+                  ) : (
+                    <div className="bg-white rounded-[24px] p-5 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#E5E5EA] flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-250">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-extrabold text-sm text-gray-900 flex items-center gap-1.5">
+                          <span>📍</span> Nové zamilované místo
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddPlace(false)}
+                          className="text-xs text-[#8E8E93] hover:text-gray-900 border border-gray-100 px-2 py-1 rounded-md"
+                        >
+                          Zavřít
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        <input
+                          type="text"
+                          placeholder="Co jsme tu prožili? (např. První rande) *"
+                          className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-855"
+                          value={newPlaceTitle}
+                          onChange={(e) => setNewPlaceTitle(e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Adresa nebo město (např. Javorek 54) *"
+                          className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-855"
+                          value={newPlaceAddress}
+                          onChange={(e) => setNewPlaceAddress(e.target.value)}
+                        />
+                        <textarea
+                          placeholder="Tvoje osobní vzpomínka nebo vzkaz..."
+                          className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full h-16 resize-none focus:ring-1 focus:ring-[#FF2D55] text-gray-855"
+                          value={newPlaceDescription}
+                          onChange={(e) => setNewPlaceDescription(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="date"
+                            className="bg-[#F2F2F7] border border-[#E5E5EA] px-3 py-2.5 rounded-[12px] text-xs flex-1 focus:ring-1 focus:ring-[#FF2D55] text-gray-800"
+                            value={newPlaceDate}
+                            onChange={(e) => setNewPlaceDate(e.target.value)}
+                          />
+                          <select
+                            className="bg-[#F2F2F7] border border-[#E5E5EA] px-3 py-2.5 rounded-[12px] text-xs focus:ring-1 focus:ring-[#FF2D55] text-gray-800"
+                            value={newPlaceEmoji}
+                            onChange={(e) => setNewPlaceEmoji(e.target.value)}
+                          >
+                            <option value="📍">📍 Špendlík</option>
+                            <option value="✨">✨ Třpyt</option>
+                            <option value="☕️">☕️ Káva</option>
+                            <option value="❤️">❤️ Srdce</option>
+                            <option value="🌸">🌸 Květina</option>
+                            <option value="🏰">🏰 Zámek</option>
+                            <option value="🏕️">🏕️ Výlet</option>
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addSpecialPlace}
+                          className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white font-bold py-2.5 rounded-[12px] text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <span>Přidat místo do mapy</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Places Log Card List */}
+                <div className="flex flex-col gap-2.5" id="places-list">
+                  <h4 className="font-extrabold text-xs text-gray-900 px-1 uppercase tracking-wider text-[#8E8E93]">Log památných míst</h4>
+                  {places.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => setSelectedPlaceId(p.id)}
+                      className={`p-4 rounded-[20px] cursor-pointer transition-all border ${
+                        selectedPlaceId === p.id 
+                          ? 'bg-red-50/50 border-[#FF2D55]/55 shadow-2xs' 
+                          : 'bg-white border-[#E5E5EA] hover:border-gray-300'
+                      } flex flex-col gap-2 relative`}
+                    >
+                      <div className="flex justify-between items-start pr-6">
+                        <div className="flex gap-2.5 items-center">
+                          <div className="w-8 h-8 rounded-full bg-[#FFE5E9] flex items-center justify-center shrink-0">
+                            <span className="text-sm">{p.emoji}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <h5 className="font-extrabold text-xs text-gray-900 leading-tight">{p.title}</h5>
+                            <span className="text-[9px] text-[#8E8E93] font-mono leading-none mt-1">
+                              {new Date(p.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Delete btn */}
+                        <button
+                          type="button"
+                          onClick={(e) => deleteSpecialPlace(p.id, e)}
+                          className="text-[#8E8E93] hover:text-red-500 p-1 rounded-md transition-colors border border-transparent absolute top-3 right-3"
+                          title="Smazat místo"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="pl-1 flex flex-col gap-1">
+                        <p className="text-[10px] text-gray-500 leading-snug font-mono italic">
+                          📍 {p.address}
+                        </p>
+                        <p className="text-[11px] text-gray-700 leading-relaxed font-sans mt-0.5">
+                          {p.description}
+                        </p>
+                      </div>
+
+                      {/* Author badge signature */}
+                      <span className="text-[8px] uppercase font-bold tracking-widest text-[#FF2D55]/60 absolute bottom-3 right-3">
+                        {p.author === 'both' ? 'Spolu 🥰' : (p.author === 'boyfriend' ? 'FáFa 👑' : 'Beru 🌸')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === Tab.WORKSPACE && (
+              <motion.div
+                key="workspace"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.25 }}
+                className="flex flex-col gap-5 pb-8"
+                id="workspace-tab"
+              >
+                {/* Back to navigation button */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(Tab.MORE)}
+                  className="mr-auto flex items-center gap-1.5 text-xs text-[#FF2D55] font-extrabold border border-[#FF2D55]/20 bg-white/50 px-3 py-1.5 rounded-full hover:bg-[#FFE5E9]/10 transition-all"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Zpět do Více</span>
+                </button>
+
+                {/* Workspace Header */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wider text-[#FF2D55] font-bold">Google Cloud Integrace</span>
+                  <h3 className="font-sans text-gray-900 font-extrabold text-xl">Google Workspace Koutek ☁️</h3>
+                </div>
+
+                {/* Auth Check layout */}
+                {!googleToken ? (
+                  <div className="bg-white rounded-[24px] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#E5E5EA] flex flex-col items-center text-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-[#F2F2F7] flex items-center justify-center">
+                      <Sparkle className="w-6 h-6 text-[#FF2D55]" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <h4 className="font-extrabold text-sm text-gray-900">Propoj svůj společný prostor</h4>
+                      <p className="text-xs text-[#8E8E93] max-w-xs leading-relaxed">
+                        Chceš psát přímo do Google Docs, posílat milostné maily přes Gmail nebo pálit láskyplné zprávy do Google Chatu? Přihlas se!
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogin}
+                      className="bg-gray-900 hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-[16px] text-xs transition-all flex items-center gap-2 shadow-sm"
+                    >
+                      <LogIn className="w-4 h-4 text-[#FF2D55]" />
+                      <span>Propojit s Google Účtem</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {/* Logged in User Pill */}
+                    <div className="bg-[#E5E5EA]/35 backdrop-blur-sm px-4 py-3 rounded-[20px] flex justify-between items-center border border-[#E5E5EA]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-[#FF2D55] text-white flex items-center justify-center text-[10px] font-bold">
+                          {googleUser?.displayName?.charAt(0) || 'U'}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-[#8E8E93] leading-none">Propojený Google Účet</span>
+                          <span className="text-xs font-bold text-gray-900 leading-tight mt-0.5 truncate max-w-[140px]">
+                            {googleUser?.displayName || 'Drahý uživatel'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleGoogleLogout}
+                        className="p-1 px-2.5 bg-white hover:bg-red-50 text-red-500 border border-red-100 rounded-md text-[10px] font-extrabold flex items-center gap-1 transition-all"
+                        title="Odpojit účet"
+                      >
+                        <LogOut className="w-3 h-3" />
+                        <span>Odpojit</span>
+                      </button>
+                    </div>
+
+                    {/* Google Sub-tabs widgets */}
+                    <div className="flex bg-[#F2F2F7] rounded-lg p-0.5 text-[10px] font-extrabold" id="workspace-sub-navigation">
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceSubTab('journal')}
+                        className={`py-2 rounded-md transition-all flex-1 text-center ${
+                          workspaceSubTab === 'journal'
+                            ? 'bg-white text-gray-900 shadow-2xs font-black'
+                            : 'text-[#8E8E93] hover:text-gray-900'
+                        }`}
+                      >
+                        📕 Společný deník
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceSubTab('gmail')}
+                        className={`py-2 rounded-md transition-all flex-1 text-center ${
+                          workspaceSubTab === 'gmail'
+                            ? 'bg-white text-gray-900 shadow-2xs font-black'
+                            : 'text-[#8E8E93] hover:text-gray-900'
+                        }`}
+                      >
+                        💌 Milostné dopisy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceSubTab('chat')}
+                        className={`py-2 rounded-md transition-all flex-1 text-center ${
+                          workspaceSubTab === 'chat'
+                            ? 'bg-white text-gray-900 shadow-2xs font-black'
+                            : 'text-[#8E8E93] hover:text-gray-900'
+                        }`}
+                      >
+                        💬 Rychlý chat
+                      </button>
+                    </div>
+
+                    {/* SUB-TAB 1: Docs Společný Deník */}
+                    {workspaceSubTab === 'journal' && (
+                      <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                        {isJournalLoading ? (
+                          <div className="bg-white rounded-[24px] py-12 border border-[#E5E5EA] flex flex-col items-center justify-center gap-2">
+                            <Loader2 className="w-8 h-8 text-[#FF2D55] animate-spin" />
+                            <span className="text-xs text-[#8E8E93]">Stahuji váš společný deník z cloudu...</span>
+                          </div>
+                        ) : !journalDocId ? (
+                          <div className="bg-white rounded-[24px] p-5 border border-[#E5E5EA] flex flex-col gap-4 shadow-3xs">
+                            <div className="flex flex-col gap-1">
+                              <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-widest text-[#FF2D55]">Deník v cloudu</h4>
+                              <p className="text-xs text-gray-600 leading-relaxed">
+                                Vytvořte jedním kliknutím nový Google Dokument, kam se budou automaticky ukládat všechny vaše drahocenné sny, vzkazy a zážitky. Budete ho moci oba společně upravovat!
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleCreateJournal}
+                              className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white font-bold py-3 rounded-[16px] text-xs transition-all flex items-center justify-center gap-2 shadow-md"
+                            >
+                              <FileText className="w-4 h-4" />
+                              <span>Založit nový deník v Google Docs</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-4 bg-white rounded-[24px] p-5 shadow-3xs border border-[#E5E5EA]">
+                            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-green-600">Propojený Google Dokument</span>
+                              <a
+                                href={`https://docs.google.com/document/d/${journalDocId}/edit`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-[#FF2D55] hover:underline font-extrabold flex items-center gap-0.5"
+                              >
+                                Otevřít v Docs ↗
+                              </a>
+                            </div>
+
+                            {/* Live document stream simulated widget */}
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[9px] text-[#8E8E93] uppercase font-bold tracking-wider">Aktuální obsah dokumentu:</span>
+                              <div className="bg-[#F2F2F7] max-h-[160px] overflow-y-auto p-3.5 rounded-[16px] text-xs font-serif text-gray-850 leading-relaxed border border-[#E5E5EA] whitespace-pre-wrap">
+                                {journalContent ? journalContent : "Dokument je zatím prázdný. Přidejte první zápisek!"}
+                              </div>
+                            </div>
+
+                            {/* Append Entry Form */}
+                            <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
+                              <span className="text-[9px] text-gray-900 font-extrabold uppercase tracking-wider">Připsat další drahocennou chvíli:</span>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Dneska jsme se tulili a dávali si palačinky... 🥰"
+                                  className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs flex-1 focus:ring-1 focus:ring-[#FF2D55] text-gray-800 font-sans"
+                                  value={newJournalText}
+                                  onChange={(e) => setNewJournalText(e.target.value)}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleAppendJournal}
+                                  className="bg-gray-900 hover:bg-gray-800 text-white font-bold px-4 py-2.5 rounded-[12px] text-xs transition-all shadow-xs"
+                                >
+                                  Zapsat
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* SUB-TAB 2: Gmail Milostné Dopisy */}
+                    {workspaceSubTab === 'gmail' && (
+                      <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-[24px] p-5 shadow-3xs border border-[#E5E5EA] flex flex-col gap-4">
+                          <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-widest text-[#FF2D55]">Poslat voňavý email 💌</h4>
+                          
+                          <div className="flex flex-col gap-3">
+                            <input
+                              type="email"
+                              placeholder="Partnerova Gmail adresa *"
+                              className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800"
+                              value={partnerEmail}
+                              onChange={(e) => setPartnerEmail(e.target.value)}
+                            />
+                            <textarea
+                              placeholder="Napiš ty nejkrásnější řádky přímo ze srdce... 🥰 Vypustíme je přímo přes tvůj Gmail."
+                              className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full h-24 resize-none focus:ring-1 focus:ring-[#FF2D55] text-gray-800"
+                              value={gmailLetterText}
+                              onChange={(e) => setGmailLetterText(e.target.value)}
+                            />
+
+                            <button
+                              type="button"
+                              onClick={handleSendLoveLetter}
+                              className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white font-bold py-3 rounded-[14px] text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <Mail className="w-4 h-4" />
+                              <span>Odeslat milostné psaní partnerskému srdci</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-TAB 3: Google Chat Bleskový chat */}
+                    {workspaceSubTab === 'chat' && (
+                      <div className="flex flex-col gap-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-[24px] p-5 shadow-3xs border border-[#E5E5EA] flex flex-col gap-4">
+                          <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-widest text-[#FF2D55]">Google Chat bleskový ping 💬</h4>
+                          
+                          <div className="flex flex-col gap-3">
+                            <label className="text-[10px] uppercase font-extrabold text-[#8E8E93]">Vyberte komunikační prostor:</label>
+                            <input
+                              type="text"
+                              placeholder="Název prostoru (např. spaces/love_room)"
+                              className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800 font-mono"
+                              value={chatSpaceName}
+                              onChange={(e) => setChatSpaceName(e.target.value)}
+                            />
+                            
+                            <input
+                              type="text"
+                              placeholder="Krátký rychlý vzkaz k vypálení..."
+                              className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800"
+                              value={chatMessageText}
+                              onChange={(e) => setChatMessageText(e.target.value)}
+                            />
+
+                            <button
+                              type="button"
+                              onClick={handleSendChatMessage}
+                              className="bg-gray-900 hover:bg-gray-800 text-white font-bold py-3 rounded-[14px] text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <MessageCircle className="w-4 h-4 text-[#FF2D55]" />
+                              <span>Odeslat ping do Google Chatu</span>
+                            </button>
+
+                            {/* Quick Romantic presets */}
+                            <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-gray-100">
+                              <span className="text-[9px] uppercase font-bold text-[#8E8E93]">Romantické rychloklepky (okamžité odeslání):</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {[
+                                  "Myslím na tebe! 🥰", 
+                                  "Miluju tě, Beru! ❤️", 
+                                  "FáFa tě moc pusinkuje! 😘",
+                                  "Chybíš mi! 🥺"
+                                ].map((preset, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                      setChatMessageText(preset);
+                                      triggerAlert("Připraveno", `Vzkaz "${preset}" byl vybrán. Můžeš jej odeslat tlačítkem výše!`, "💬");
+                                    }}
+                                    className="bg-red-50 hover:bg-[#FFE5E9] text-[#FF2D55] text-[10px] font-bold px-3 py-1.5 rounded-full transition-all border border-[#FF2D55]/10"
+                                  >
+                                    {preset}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === Tab.MORE && (
+              <motion.div
+                key="more_launchpad"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.25 }}
+                className="flex flex-col gap-5 pb-8"
+                id="more-launchpad"
+              >
+                {/* Header */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs uppercase tracking-wider text-[#FF2D55] font-bold">Více funkcí</span>
+                  <h3 className="font-sans text-gray-900 font-extrabold text-xl">Láskyplný Rozcestník 🌸</h3>
+                </div>
+
+                {/* The Launchpad grid */}
+                <div className="grid grid-cols-2 gap-3.5" id="ios-launchpad-grid">
+                  <div
+                    onClick={() => setActiveTab(Tab.WORKSPACE)}
+                    className="bg-white p-5 rounded-[24px] border border-[#E5E5EA] shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col items-center text-center gap-2"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 text-lg">
+                      ☁️
+                    </div>
+                    <span className="font-extrabold text-xs text-gray-900 leading-none">Google Koutek</span>
+                    <span className="text-[9px] text-[#8E8E93] leading-tight">Docs, Gmail & Chat propojení</span>
+                  </div>
+
+                  <div
+                    onClick={() => setActiveTab(Tab.TIMELINE)}
+                    className="bg-white p-5 rounded-[24px] border border-[#E5E5EA] shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col items-center text-center gap-2"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center text-[#FF2D55] text-lg">
+                      📅
+                    </div>
+                    <span className="font-extrabold text-xs text-gray-900 leading-none">Společný kalendář</span>
+                    <span className="text-[9px] text-[#8E8E93] leading-tight">Naše milníky v čase</span>
+                  </div>
+
+                  <div
+                    onClick={() => setActiveTab(Tab.MESSAGE_BOARD)}
+                    className="bg-white p-5 rounded-[24px] border border-[#E5E5EA] shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col items-center text-center gap-2 col-span-2"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 text-lg">
+                      💌
+                    </div>
+                    <span className="font-extrabold text-xs text-gray-900 leading-none">Nástěnka sladkých vzkazů</span>
+                    <span className="text-[9px] text-[#8E8E93] leading-tight">Posílejte si sladké lístečky a lepte je na zeď</span>
+                  </div>
+                </div>
+
+                {/* PWA Home Launcher Instructions */}
+                <div className="bg-white rounded-[24px] p-5 shadow-3xs border border-[#E5E5EA] flex flex-col gap-3">
+                  <h4 className="font-extrabold text-[11px] text-gray-900 uppercase tracking-widest text-[#FF2D55] flex items-center gap-1">
+                    <Smartphone className="w-3.5 h-3.5" /> Jak nainstalovat PWA Web Appku?
+                  </h4>
+                  <p className="text-[10px] text-gray-600 leading-relaxed font-sans">
+                    Aby tato aplikace běžela na tvém iPhonu nebo Androidu jako opravdová nativní aplikace přímo s ikonou na ploše:
+                  </p>
+                  <ol className="text-[10px] text-gray-700 list-decimal list-inside space-y-1.5 pl-1.5 font-sans leading-relaxed">
+                    <li>Otevři tuto stránku v prohlížeči <strong>Safari</strong> (iPhone) nebo <strong>Chrome</strong> (Android).</li>
+                    <li>Klepni na tlačítko <strong>Sdílet</strong> (Safari) nebo ikonu se třemi tečkami (Chrome).</li>
+                    <li>Zvol možnost <strong>Přidat na plochu</strong> (Add to Home Screen).</li>
+                    <li>Ulož a spusť ji přímo z plochy telefonu. Aplikace se otevře na celou obrazovku bez řádků prohlížeče!</li>
+                  </ol>
+                </div>
+
+                {/* Professional vCard Metadata Author Signature */}
+                <div className="bg-[#FFE5E3]/10 rounded-[24px] p-5 border border-[#FF2D55]/10 mt-2 flex flex-col gap-3" id="vcard-author">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src="https://fkdev.xyz/pwa-icon-512.png"
+                      alt="František Kalášek Logo"
+                      referrerPolicy="no-referrer"
+                      className="w-10 h-10 rounded-full bg-white object-contain border border-[#FF2D55]/15"
+                    />
+                    <div className="flex flex-col animate-pulse">
+                      <h4 className="font-black text-xs text-gray-900 leading-tight">František Kalášek</h4>
+                      <span className="text-[9px] font-semibold text-gray-500 leading-none mt-1">TopBot PwnZ™ • Web, PWA & Automatizace</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-1.5 border-t border-gray-100 pt-2.5 text-[9px] font-mono text-gray-600">
+                    <div className="flex items-center justify-between">
+                      <span>Webové stránky:</span>
+                      <a href="https://fkdev.xyz" target="_blank" rel="noreferrer" className="text-[#FF2D55] font-bold hover:underline">fkdev.xyz</a>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>E-mail:</span>
+                      <a href="mailto:FandaKalasek@icloud.com" className="text-gray-800 hover:underline">FandaKalasek@icloud.com</a>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Telefonní kontakt:</span>
+                      <a href="tel:+420722426195" className="text-gray-800 hover:underline font-bold">+420 722 426 195</a>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Adresa sídla:</span>
+                      <span className="text-gray-800">Javorek 54, 592 03 Česko</span>
+                    </div>
+                  </div>
+                  <blockquote className="border-l-2 border-[#FF2D55]/30 pl-2.5 text-[9px] italic text-gray-500 leading-relaxed font-serif mt-1">
+                    &ldquo;Bridge the gap, create the world.&rdquo;
+                  </blockquote>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
 
         </div>
 
-        {/* Beautiful Elegant Native Bottom iOS Navigation Panel */}
-        <div className="absolute bottom-0 inset-x-0 bg-white/80 backdrop-blur-md border-t border-gray-100 py-2.5 px-4 flex justify-between items-center z-40 h-16 shrink-0" id="ios-bottom-nav">
+        {/* Beautiful Elegant Native Bottom iOS Navigation Panel with 5 columns for phone view */}
+        <div className="absolute bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-gray-100 py-2.5 px-3 flex justify-between items-center z-40 h-16 shrink-0" id="ios-bottom-nav">
           
           <button
             type="button"
             id="nav-love"
             onClick={() => setActiveTab(Tab.LOVE_COUNTER)}
-            className={`flex flex-col items-center gap-0.5 transition-all text-center min-w-[50px] ${
+            className={`flex flex-col items-center gap-1 transition-all text-center flex-1 max-w-[65px] ${
               activeTab === Tab.LOVE_COUNTER ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
             }`}
           >
-            <Heart className={`w-5 h-5 ${activeTab === Tab.LOVE_COUNTER ? 'fill-[#FF2D55]' : ''}`} />
-            <span className="text-[9px] font-semibold tracking-tight">Miláček</span>
+            <Heart className={`w-4.5 h-4.5 ${activeTab === Tab.LOVE_COUNTER ? 'fill-[#FF2D55]' : ''}`} />
+            <span className="text-[8px] font-black tracking-tight leading-none mt-0.5">Miláček</span>
           </button>
 
           <button
             type="button"
             id="nav-poet"
             onClick={() => setActiveTab(Tab.AI_POET)}
-            className={`flex flex-col items-center gap-0.5 transition-all text-center min-w-[50px] ${
+            className={`flex flex-col items-center gap-1 transition-all text-center flex-1 max-w-[65px] ${
               activeTab === Tab.AI_POET ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
             }`}
           >
-            <Sparkles className={`w-5 h-5 ${activeTab === Tab.AI_POET ? 'fill-[#FF2D55]' : ''}`} />
-            <span className="text-[9px] font-semibold tracking-tight">Básník</span>
+            <Sparkles className={`w-4.5 h-4.5 ${activeTab === Tab.AI_POET ? 'fill-[#FF2D55]' : ''}`} />
+            <span className="text-[8px] font-black tracking-tight leading-none mt-0.5">Básník</span>
+          </button>
+
+          <button
+            type="button"
+            id="nav-places"
+            onClick={() => setActiveTab(Tab.PLACES)}
+            className={`flex flex-col items-center gap-1 transition-all text-center flex-1 max-w-[65px] ${
+              activeTab === Tab.PLACES ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
+            }`}
+          >
+            <MapPin className={`w-4.5 h-4.5 ${activeTab === Tab.PLACES ? 'fill-[#FF2D55]' : ''}`} />
+            <span className="text-[8px] font-black tracking-tight leading-none mt-0.5">Místa</span>
           </button>
 
           <button
             type="button"
             id="nav-gallery"
             onClick={() => setActiveTab(Tab.GALLERY)}
-            className={`flex flex-col items-center gap-0.5 transition-all text-center min-w-[50px] ${
+            className={`flex flex-col items-center gap-1 transition-all text-center flex-1 max-w-[65px] ${
               activeTab === Tab.GALLERY ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
             }`}
           >
-            <ImageIcon className="w-5 h-5" />
-            <span className="text-[9px] font-semibold tracking-tight">Galerie</span>
+            <ImageIcon className={`w-4.5 h-4.5 ${activeTab === Tab.GALLERY ? 'text-[#FF2D55]' : ''}`} />
+            <span className="text-[8px] font-black tracking-tight leading-none mt-0.5">Galerie</span>
           </button>
 
           <button
             type="button"
-            id="nav-messages"
-            onClick={() => setActiveTab(Tab.MESSAGE_BOARD)}
-            className={`flex flex-col items-center gap-0.5 transition-all text-center min-w-[50px] ${
-              activeTab === Tab.MESSAGE_BOARD ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
+            id="nav-more"
+            onClick={() => setActiveTab(Tab.MORE || Tab.WORKSPACE)}
+            className={`flex flex-col items-center gap-1 transition-all text-center flex-1 max-w-[65px] ${
+              (activeTab === Tab.MORE || activeTab === Tab.WORKSPACE || activeTab === Tab.TIMELINE || activeTab === Tab.MESSAGE_BOARD) ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
             }`}
           >
-            <MessageSquare className="w-5 h-5" />
-            <span className="text-[9px] font-semibold tracking-tight">Vzkazy</span>
-          </button>
-
-          <button
-            type="button"
-            id="nav-timeline"
-            onClick={() => setActiveTab(Tab.TIMELINE)}
-            className={`flex flex-col items-center gap-0.5 transition-all text-center min-w-[50px] ${
-              activeTab === Tab.TIMELINE ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
-            }`}
-          >
-            <CalendarIcon className="w-5 h-5" />
-            <span className="text-[9px] font-semibold tracking-tight">Kalendář</span>
+            <Menu className="w-4.5 h-4.5" />
+            <span className="text-[8px] font-black tracking-tight leading-none mt-0.5">Více</span>
           </button>
 
         </div>
+
+        {/* Custom Confirmation Dialog Overlay (iOS Native Feel) */}
+        <AnimatePresence>
+          {customConfirm && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-6 z-[200] animate-in fade-in duration-200" id="custom-confirmation-modal">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: 15 }}
+                transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                className="bg-white/95 backdrop-blur-lg rounded-[22px] w-full max-w-xs overflow-hidden shadow-[0_24px_50px_rgba(0,0,0,0.18)] border border-gray-100/30 text-center flex flex-col pt-5"
+              >
+                <div className="px-5 pb-4 flex flex-col gap-1.5 shrink-0">
+                  <h4 className="font-extrabold text-sm text-gray-950 font-sans tracking-tight leading-tight">{customConfirm.title}</h4>
+                  <p className="text-[11px] text-gray-600 font-sans leading-normal px-1">{customConfirm.message}</p>
+                </div>
+                <div className="flex border-t border-gray-200/50 h-11 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setCustomConfirm(null)}
+                    className="flex-1 font-semibold text-xs text-blue-500 hover:bg-gray-50 active:bg-gray-100 transition-colors border-r border-gray-200/50"
+                  >
+                    {customConfirm.cancelText || 'Zrušit'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={customConfirm.onConfirm}
+                    className={`flex-1 font-extrabold text-xs hover:bg-gray-50 active:bg-gray-100 transition-colors ${
+                      customConfirm.isDestructive ? 'text-red-500' : 'text-blue-500'
+                    }`}
+                  >
+                    {customConfirm.confirmText}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Alert Overlay Dialog (iOS Style Alert toast) */}
+        <AnimatePresence>
+          {customAlert && (
+            <div className="fixed inset-0 bg-[#000000]/50 backdrop-blur-xs flex items-center justify-center p-6 z-[200] animate-in fade-in duration-200" id="custom-alert-modal">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: 15 }}
+                transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                className="bg-white/95 backdrop-blur-lg rounded-[22px] w-full max-w-xs overflow-hidden shadow-[0_24px_50px_rgba(0,0,0,0.18)] border border-gray-100/30 text-center flex flex-col pt-5"
+              >
+                <div className="px-5 pb-4 flex flex-col items-center gap-2 shrink-0">
+                  <div className="text-2xl animate-bounce">{customAlert.icon || '✨'}</div>
+                  <h4 className="font-extrabold text-sm text-gray-950 font-sans tracking-tight leading-tight">{customAlert.title}</h4>
+                  <p className="text-[11px] text-gray-600 font-sans leading-normal px-2">{customAlert.message}</p>
+                </div>
+                <div className="border-t border-gray-200/50 h-11 shrink-0 flex">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customAlert.onClose) customAlert.onClose();
+                      setCustomAlert(null);
+                    }}
+                    className="flex-1 font-black text-xs text-blue-500 hover:bg-gray-50 active:bg-[#FFE5E9]/10 transition-colors"
+                  >
+                    Rozumím
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
       </div>
     </div>
