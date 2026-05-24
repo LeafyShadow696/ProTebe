@@ -41,6 +41,22 @@ async function generateWithOpenAI(prompt: string): Promise<string> {
   return extractOpenAIText(data);
 }
 
+function generateLocalFallback(category: string, customInput?: string): string {
+  const detail = customInput?.trim()
+    ? `\n\nA dnes do toho vkládám i tuhle malou jiskru: ${customInput.trim()}.`
+    : "";
+
+  if (category === "funny") {
+    return `Michaelko, kdyby se láska dala měřit v notifikacích, můj telefon by se z tebe dávno proměnil v ohňostroj.\n\nOd 3. dubna 2026 mám v životě jednu nejmilejší chybu v systému: pořád mi běží proces, který se jmenuje myslím na tebe.${detail}`;
+  }
+
+  if (category === "compliment") {
+    return `Michaelko, jsi ten druh světla, které nezáří nahlas, ale najednou díky němu všechno dává větší smysl.\n\nOd 3. dubna 2026 si v sobě nesu jistotu, že některá setkání nejsou náhoda, ale začátek domova.${detail}`;
+  }
+
+  return `Michaelko,\n\nod 3. dubna 2026 se čas počítá jinak.\nNe podle hodin,\nale podle chvílí,\nkdy se mi při myšlence na tebe ztiší celý svět.\n\nJsi něha, která zůstává,\nradost, která se vrací,\na důvod, proč i obyčejný den umí být krásný.${detail}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { category, customInput } = await req.json();
@@ -90,12 +106,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!resultText) {
-      resultText = await generateWithOpenAI(prompt);
+    if (!resultText && process.env.OPENAI_API_KEY) {
+      try {
+        resultText = await generateWithOpenAI(prompt);
+      } catch (openAIError) {
+        console.warn("OpenAI fallback failed, using local fallback:", openAIError);
+      }
     }
 
     if (!resultText) {
-      throw new Error("AI provider returned an empty response");
+      resultText = generateLocalFallback(category, customInput);
     }
 
     return NextResponse.json({ text: resultText });
