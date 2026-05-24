@@ -1,24 +1,48 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5-mini";
+
+function extractOpenAIText(response: any): string {
+  if (typeof response.output_text === "string" && response.output_text.trim()) {
+    return response.output_text;
+  }
+
+  const parts = response.output
+    ?.flatMap((item: any) => item.content || [])
+    ?.map((content: any) => content.text)
+    ?.filter(Boolean);
+
+  return parts?.join("\n").trim() || "";
+}
+
+async function generateWithOpenAI(prompt: string): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
+
+  const res = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      input: prompt,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(`OpenAI fallback failed: ${JSON.stringify(data)}`);
+  }
+
+  return extractOpenAIText(data);
+}
+
 export async function POST(req: NextRequest) {
   try {
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json(
-        { error: "AI básník není nakonfigurovaný. Doplňte GEMINI_API_KEY v prostředí aplikace." },
-        { status: 503 }
-      );
-    }
-
-    const ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          "User-Agent": "myshell-romance-app",
-        },
-      },
-    });
-
     const { category, customInput } = await req.json();
 
     const dateMet = "3. dubna 2026"; // 3.4.2026
@@ -40,15 +64,39 @@ export async function POST(req: NextRequest) {
 
     prompt += "\nOdpověď vrať čistě jako text, bez uvozovek na začátku a na konci, bez nadpisu, zformátované do pěkných odstavců nebo veršů.";
 
-    const response = await ai.models.generateContent({
-      model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        temperature: 0.9,
-      }
-    });
+    let resultText = "";
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const ai = new GoogleGenAI({
+          apiKey: process.env.GEMINI_API_KEY,
+          httpOptions: {
+            headers: {
+              "User-Agent": "myshell-romance-app",
+            },
+          },
+        });
 
-    const resultText = response.text || "Nepodařilo se vygenerovat vzkaz. Zkus to prosím znovu.";
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+            temperature: 0.9,
+          },
+        });
+
+        resultText = response.text || "";
+      } catch (geminiError) {
+        console.warn("Gemini generation failed, trying OpenAI fallback:", geminiError);
+      }
+    }
+
+    if (!resultText) {
+      resultText = await generateWithOpenAI(prompt);
+    }
+
+    if (!resultText) {
+      throw new Error("AI provider returned an empty response");
+    }
 
     return NextResponse.json({ text: resultText });
   } catch (error: any) {
