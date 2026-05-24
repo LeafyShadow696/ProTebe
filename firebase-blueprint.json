@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "Photo": {
+      "title": "Photo",
+      "description": "A photo uploaded to the gallery",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "description": "Base64 string or storage URL" },
+        "caption": { "type": "string" },
+        "date": { "type": "string" },
+        "isFavorite": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["url", "caption", "date", "isFavorite"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "A message board note",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "author": { "type": "string" },
+        "date": { "type": "string" },
+        "isPinned": { "type": "boolean" },
+        "reactions": { "type": "object" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["text", "author", "date", "isPinned", "reactions"]
+    },
+    "Milestone": {
+      "title": "Milestone",
+      "description": "A calendar milestone",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "emoji": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["date", "title", "description", "emoji"]
+    }
+  },
+  "firestore": {
+    "/photos/{photoId}": {
+      "schema": { "$ref": "#/entities/Photo" },
+      "description": "Gallery photos"
+    },
+    "/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/Note" },
+      "description": "Message board notes"
+    },
+    "/milestones/{milestoneId}": {
+      "schema": { "$ref": "#/entities/Milestone" },
+      "description": "Timeline milestones"
+    }
+  }
+}

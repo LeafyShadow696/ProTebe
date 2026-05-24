@@ -3,7 +3,5 @@ node_modules/
 coverage/
 .DS_Store
 *.log
-tsconfig.tsbuildinfo
 .env*
 !.env.example
-.vercel

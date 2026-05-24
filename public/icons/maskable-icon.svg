@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Srdce pro Michaelku">
-  <rect width="512" height="512" fill="#ff2d55"/>
-  <circle cx="256" cy="256" r="220" fill="#ff5a7a"/>
-  <path d="M256 372s-118-68-118-158c0-49 34-85 80-85 26 0 49 13 62 34 13-21 36-34 62-34 46 0 80 36 80 85 0 90-118 158-118 158z" fill="#fff"/>
-</svg>

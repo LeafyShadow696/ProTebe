@@ -1,62 +1,32 @@
 import type {Metadata} from 'next';
-import Script from 'next/script';
-import './globals.css';
+import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.APP_URL || 'https://fkdev.xyz'),
-  title: {
-    default: 'Srdce pro Michaelku',
-    template: '%s | Srdce pro Michaelku',
-  },
-  description: 'Soukromá romantická PWA pro společné vzpomínky, vzkazy, místa a AI básně.',
-  manifest: '/manifest.webmanifest',
-  applicationName: 'Srdce pro Michaelku',
+  title: 'Beru & FáFa 💞',
+  description: 'Naše krásná PWA aplikace lásky',
   appleWebApp: {
     capable: true,
-    title: 'Srdce',
     statusBarStyle: 'default',
+    title: 'Beru & FáFa',
   },
-  formatDetection: {
-    telephone: false,
-  },
+  manifest: '/manifest.json',
   icons: {
-    icon: [
-      {url: '/icons/icon.svg', type: 'image/svg+xml'},
-    ],
-    apple: [
-      {url: '/icons/apple-touch-icon.svg', type: 'image/svg+xml'},
-    ],
-  },
-  openGraph: {
-    title: 'Srdce pro Michaelku',
-    description: 'Soukromá romantická PWA pro společné vzpomínky, vzkazy, místa a AI básně.',
-    type: 'website',
+    apple: '/icon.png',
   },
 };
 
 export const viewport = {
+  themeColor: '#F2F2F7',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  viewportFit: 'cover',
-  themeColor: '#FF2D55',
+  userScalable: false,
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="cs">
-      <body suppressHydrationWarning>
-        {children}
-        <Script id="register-service-worker" strategy="afterInteractive">
-          {`
-            if ('serviceWorker' in navigator && window.isSecureContext) {
-              window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(() => {});
-              });
-            }
-          `}
-        </Script>
-      </body>
+    <html lang="en">
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

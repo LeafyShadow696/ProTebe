@@ -1,0 +1,89 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    
+    function incoming() { 
+      return request.resource.data; 
+    }
+    
+    function existing() { 
+      return resource.data; 
+    }
+
+    // Since this is a hardcoded couple's app, we expect all documents to belong to the "fafa_and_beru" coupleId
+    // and only allow read if it's set. 
+    // We will validate that users can only create data for this coupleId.
+    function isCoupleData(data) {
+      return data.coupleId == 'fafa_and_beru';
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll(['coupleId', 'text', 'author', 'date', 'isPinned', 'createdAt'])
+        && data.keys().size() >= 6
+        && data.coupleId == 'fafa_and_beru'
+        && data.text is string && data.text.size() <= 5000
+        && data.author is string && data.author.size() <= 100
+        && data.date is string && data.date.size() <= 100
+        && data.isPinned is bool
+        && data.createdAt == request.time;
+    }
+
+    function isValidMilestone(data) {
+      return data.keys().hasAll(['coupleId', 'date', 'title', 'description', 'emoji', 'createdAt'])
+        && data.keys().size() >= 6
+        && data.coupleId == 'fafa_and_beru'
+        && data.date is string && data.date.size() <= 100
+        && data.title is string && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 5000
+        && data.emoji is string && data.emoji.size() <= 10
+        && data.createdAt == request.time;
+    }
+    
+    function isValidNotification(data) {
+       return data.keys().hasAll(['coupleId', 'type', 'message', 'createdAt', 'isRead', 'creator'])
+        && data.keys().size() >= 6
+        && data.coupleId == 'fafa_and_beru'
+        && data.type is string && data.type.size() <= 100
+        && data.message is string && data.message.size() <= 500
+        && data.creator is string && data.creator.size() <= 100
+        && data.isRead is bool
+        && data.createdAt == request.time;
+    }
+
+    match /notes/{noteId} {
+      allow read: if isSignedIn() && existing().coupleId == 'fafa_and_beru';
+      allow create: if isSignedIn() && isValidId(noteId) && isValidNote(incoming());
+      allow update: if isSignedIn() && isValidId(noteId) && existing().coupleId == 'fafa_and_beru' &&
+         isCoupleData(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isSignedIn() && isValidId(noteId) && existing().coupleId == 'fafa_and_beru';
+    }
+
+    match /milestones/{milestoneId} {
+      allow read: if isSignedIn() && existing().coupleId == 'fafa_and_beru';
+      allow create: if isSignedIn() && isValidId(milestoneId) && isValidMilestone(incoming());
+      allow update: if isSignedIn() && isValidId(milestoneId) && existing().coupleId == 'fafa_and_beru' &&
+         isCoupleData(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isSignedIn() && isValidId(milestoneId) && existing().coupleId == 'fafa_and_beru';
+    }
+    
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && existing().coupleId == 'fafa_and_beru';
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming());
+      allow update: if isSignedIn() && isValidId(notificationId) && existing().coupleId == 'fafa_and_beru' &&
+         isCoupleData(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isSignedIn() && isValidId(notificationId) && existing().coupleId == 'fafa_and_beru';
+    }
+  }
+}

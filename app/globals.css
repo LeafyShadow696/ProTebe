@@ -1,41 +1,24 @@
 @import "tailwindcss";
 
-:root {
-  color-scheme: light;
-  background: #f2f2f7;
-  --app-accent: #ff2d55;
-}
+@layer base {
+  body {
+    background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+    background-attachment: fixed;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    overscroll-behavior-y: none; /* Prevents pull-to-refresh gap on mobile */
+  }
 
-* {
-  box-sizing: border-box;
-}
-
-html {
-  min-height: 100%;
-  background: #f2f2f7;
-  overflow-x: hidden;
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  min-height: 100dvh;
-  margin: 0;
-  background: #f2f2f7;
-  overscroll-behavior-y: none;
-  overflow-x: hidden;
-}
-
-button,
-input,
-textarea,
-select {
-  font: inherit;
-}
-
-button {
-  -webkit-tap-highlight-color: transparent;
-}
-
-img {
-  max-width: 100%;
+  /* Custom iOS scrollbar hiding (WebKit) */
+  .custom-ios-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .custom-ios-scroll {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+    -webkit-overflow-scrolling: touch; /* Native smooth momentum scrolling */
+    overscroll-behavior-y: contain; /* Prevents parent scrolling bounce */
+  }
 }

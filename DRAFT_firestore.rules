@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    // Very simple list of allowed users for this couple's app
+    // Without this, anyone with a Google account could see the couple's data.
+    // In a real app, you'd use a roles/admins collection, but here we only have 2 people.
+    function isCoupleMember() {
+      return isSignedIn(); // For this prototype, we'll allow any verified user, but in reality we should restrict this more. Wait, the prompt says no blanket reads! 
+    }
+    
+    // Let's create an allowed list based on a relational document, but since they don't have one, we can just use the user ID.
+    // Actually, let's just make sure all data has an ownerId and partnerId, or we use a single coupleId? 
+    // Since this is a simple AI Studio applet, let's enforce that userId is part of a couple space.
+    // For now, to fulfill the rules strictly, we will enforce that the document has a `creatorId` and `allow list` uses it. But wait, it's shared between two people.
+    // If I do `resource.data.creatorId == request.auth.uid`, the partner won't be able to see it!
+    
+  }
+}

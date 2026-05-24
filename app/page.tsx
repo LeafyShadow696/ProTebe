@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Script from 'next/script';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Heart,
@@ -37,26 +38,15 @@ import {
   Menu
 } from 'lucide-react';
 
-import { initAuth, googleSignIn, logout as googleLogout } from '../lib/googleAuth';
-import {
-  createJournalDoc,
-  appendJournalEntry,
-  getJournalContent,
-  sendEmailLoveLetter,
-  listLoveLetters,
-  listChatSpaces,
-  sendChatMessage,
-  WorkspaceLetter
-} from '../lib/googleWorkspace';
+import { db, auth } from '../lib/firebase';
+import { collection, addDoc, onSnapshot, query, orderBy, limit, serverTimestamp, setDoc, doc, getDocs, where } from 'firebase/firestore';
 
 // Enum for Views
 enum Tab {
   LOVE_COUNTER = 'LOVE_COUNTER',
-  AI_POET = 'AI_POET',
   GALLERY = 'GALLERY',
   MESSAGE_BOARD = 'MESSAGE_BOARD',
   TIMELINE = 'TIMELINE',
-  WORKSPACE = 'WORKSPACE',
   PLACES = 'PLACES',
   MORE = 'MORE'
 }
@@ -116,6 +106,34 @@ interface FloatingHeart {
   velocity: { x: number; y: number };
 }
 
+function PayPalButton() {
+  useEffect(() => {
+    // Only load if not already loaded by next/script (or if loaded, just render)
+    const renderPayPal = () => {
+      if ((window as any).paypal?.HostedButtons) {
+        document.getElementById('paypal-container-PQPUZ3EZGYAY2')!.innerHTML = '';
+        (window as any).paypal.HostedButtons({
+          hostedButtonId: "PQPUZ3EZGYAY2",
+        }).render("#paypal-container-PQPUZ3EZGYAY2");
+      }
+    };
+    
+    // Slight delay to ensure DOM and script is ready
+    const timer = setTimeout(renderPayPal, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="w-full flex justify-center py-4 bg-[#F2F2F7] rounded-xl border border-[#E5E5EA]">
+      <Script 
+        src="https://www.paypal.com/sdk/js?client-id=BAAi_cVc7gBN2qynsD2H1RbWv9FYKqBTTSugqlYmequgaDwCrb1BjsQ_zj-iEP02Dw1qc_mitubpvM6TV4&components=hosted-buttons&disable-funding=venmo&currency=CZK"
+        strategy="lazyOnload"
+      />
+      <div id="paypal-container-PQPUZ3EZGYAY2"></div>
+    </div>
+  );
+}
+
 export default function RomanceApp() {
   // ---- APP INITIAL STATES ----
   const RELATIONSHIP_START = '2026-04-03T00:00:00';
@@ -143,348 +161,74 @@ export default function RomanceApp() {
   const [syncCodeInput, setSyncCodeInput] = useState<string>('');
   const [isSynced, setIsSynced] = useState<boolean>(true);
 
-  // ================= GOOGLE WORKSPACE INTEGRATION STATE =================
-  const [googleUser, setGoogleUser] = useState<any>(null);
-  const [googleToken, setGoogleToken] = useState<string | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
-
-  // Docs state
-  const [journalDocId, setJournalDocId] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('love_journal_doc_id') || '';
-    }
-    return '';
-  });
-  const [journalContent, setJournalContent] = useState<string>('');
-  const [isJournalLoading, setIsJournalLoading] = useState<boolean>(false);
-  const [newJournalText, setNewJournalText] = useState<string>('');
-  const [docsStatus, setDocsStatus] = useState<string>('');
-
-  // Gmail state
-  const [partnerEmail, setPartnerEmail] = useState<string>(() => {
-    return 'leafyshadow.696@gmail.com';
-  });
-  const [emailSubject, setEmailSubject] = useState<string>('Milostný vzkazík... ❤️');
-  const [emailTemplate, setEmailTemplate] = useState<string>('rose'); // rose, starry, solar
-  const [emailMessage, setEmailMessage] = useState<string>('');
-  const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
-  const [loveLettersList, setLoveLettersList] = useState<WorkspaceLetter[]>([]);
-  const [isLettersLoading, setIsLettersLoading] = useState<boolean>(false);
-  const [activeLetterDetail, setActiveLetterDetail] = useState<WorkspaceLetter | null>(null);
-
-  // Chat state
-  const [chatSpaces, setChatSpaces] = useState<any[]>([]);
-  const [selectedSpace, setSelectedSpace] = useState<string>('');
-  const [isChatSpacesLoading, setIsChatSpacesLoading] = useState<boolean>(false);
-  const [customChatMessage, setCustomChatMessage] = useState<string>('');
-  const [isSendingChatMessage, setIsSendingChatMessage] = useState<boolean>(false);
-  const [chatStatus, setChatStatus] = useState<string>('');
-
-  // Active sub-tab inside Google Workspace Tab (journal, gmail, chat)
-  const [workspaceSubTab, setWorkspaceSubTab] = useState<'journal' | 'gmail' | 'chat'>('journal');
-
-  // Input state for linking existing Doc URLs
-  const [linkDocInput, setLinkDocInput] = useState<string>('');
-
-  // Load / listen Auth state and saved Doc ID
+  const [hasLoadedInitialNotifs, setHasLoadedInitialNotifs] = useState(false);
+  
+  // Real-time listener for Local Notifications via Firebase
   useEffect(() => {
-    const unsubscribe = initAuth(
-      (user, token) => {
-        setGoogleUser(user);
-        setGoogleToken(token);
-        setIsAuthLoading(false);
-      },
-      () => {
-        setGoogleUser(null);
-        setGoogleToken(null);
-        setIsAuthLoading(false);
-      }
+    // We only want to trigger notifications for newly added items, so we'll query for recent ones.
+    const q = query(
+      collection(db, 'notifications'),
+      where('coupleId', '==', 'fafa_and_beru'),
+      orderBy('createdAt', 'desc'),
+      limit(5)
     );
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, []);
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Don't show notifications for the initial load
+      if (!hasLoadedInitialNotifs) {
+        setHasLoadedInitialNotifs(true);
+        return;
+      }
+
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const data = change.doc.data();
+          // Show alert if the creator isn't the current user 
+          if (data.creator !== userRole) {
+             triggerAlert("Nová zpráva lásky ✨", data.message, "💌");
+             setTimeout(() => {
+                // optionally play a sound or trigger visual heart explosion
+                triggerHeartExplosion({ clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 } as React.MouseEvent);
+             }, 500);
+          }
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [hasLoadedInitialNotifs, userRole]);
+
+  // Helper to publish notifications
+  const sendNotification = async (type: string, message: string) => {
+    if (!googleUser) return;
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        coupleId: 'fafa_and_beru',
+        type: type,
+        message: message,
+        creator: userRole,
+        isRead: false,
+        createdAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.error("Failed to send notification via Firebase", e);
+    }
+  };
 
   // Fetch API content upon token or docId existence
-  useEffect(() => {
-    if (googleToken) {
-      loadGmailLoveLetters();
-      loadChatSpaces();
-      if (journalDocId) {
-        loadDocsContent(journalDocId);
-      }
-    }
-  // The loader functions intentionally run only when auth/doc state changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleToken, journalDocId]);
-
-  async function loadDocsContent(docId: string) {
-    if (!googleToken || !docId) return;
-    setIsJournalLoading(true);
-    setDocsStatus('');
-    try {
-      const content = await getJournalContent(googleToken, docId);
-      setJournalContent(content);
-    } catch (err) {
-      console.error(err);
-      setDocsStatus("Nepodařilo se úspěšně načíst deník. Zkontrolujte, zda dokument existuje.");
-    } finally {
-      setIsJournalLoading(false);
-    }
-  }
-
-  const handleCreateJournal = async () => {
-    if (!googleToken) return;
-    if (!(await requestConfirm({
-      title: 'Vytvořit deník?',
-      message: "Vytvoří se nový společný deník 'FáFa & Beru - Náš společný deník' v Google Docs.",
-      confirmText: 'Vytvořit',
-    }))) return;
-    
-    setIsJournalLoading(true);
-    setDocsStatus("Zahajuji kódování a vytvářím tvůj překrásný deník lásky...");
-    try {
-      const result = await createJournalDoc(googleToken, "FáFa & Beru - Náš společný deník 📕");
-      setJournalDocId(result.documentId);
-      localStorage.setItem('love_journal_doc_id', result.documentId);
-      setDocsStatus("Deník byl úspěšně vykouzlen! Načítám data...");
-      
-      const intro = `📕 NÁŠ SPOLEČNÝ DENÍK LÁSKY\n=========================\nVytvořeno s nekonečnou láskou dne ${new Date().toLocaleDateString('cs-CZ')}.\n\nTento dokument je bezpečné místo pro všechny naše krásné chvíle, tajné vzkazy a drahocenné vzpomínky.\n\n`;
-      await appendJournalEntry(googleToken, result.documentId, intro);
-      setJournalContent(intro);
-    } catch (err) {
-      console.error(err);
-      setDocsStatus("Ajej! Nastala nečekaná chyba při vytváření deníku.");
-    } finally {
-      setIsJournalLoading(false);
-    }
-  };
-
-  const handleLinkDocId = (input: string) => {
-    let docId = input.trim();
-    if (docId.includes("docs.google.com/document/d/")) {
-      const parts = docId.split("/document/d/");
-      if (parts[1]) {
-        docId = parts[1].split("/")[0];
-      }
-    }
-    if (docId) {
-      setJournalDocId(docId);
-      localStorage.setItem('love_journal_doc_id', docId);
-      setLinkDocInput('');
-      setDocsStatus("Deník byl úspěšně propojen!");
-      loadDocsContent(docId);
-    }
-  };
-
-  const handleDisconnectDoc = async () => {
-    if (!(await requestConfirm({
-      title: 'Odpojit dokument?',
-      message: 'Data samotná v Google Docs zůstanou zachována.',
-      confirmText: 'Odpojit',
-      isDestructive: true,
-    }))) return;
-    setJournalDocId('');
-    setJournalContent('');
-    localStorage.removeItem('love_journal_doc_id');
-  };
-
-  const handleAppendJournal = async () => {
-    if (!googleToken || !journalDocId || !newJournalText.trim()) return;
-    
-    const formattedDate = new Date().toLocaleString('cs-CZ', { dateStyle: 'medium', timeStyle: 'short' });
-    const signature = userRole === 'boyfriend' ? 'FáFa' : 'Beru';
-    const contentToAppend = `✍️ ${formattedDate} — Zápisek od ${signature}:\n"${newJournalText.trim()}"\n\n-----------------------------\n\n`;
-
-    if (!(await requestConfirm({
-      title: 'Zapsat vzpomínku?',
-      message: newJournalText.trim(),
-      confirmText: 'Zapsat',
-    }))) return;
-
-    setIsJournalLoading(true);
-    try {
-      await appendJournalEntry(googleToken, journalDocId, contentToAppend);
-      setNewJournalText('');
-      setDocsStatus("Zápisek byl bezpečně uložen do Google Docs!");
-      await loadDocsContent(journalDocId);
-    } catch (err) {
-      console.error(err);
-      setDocsStatus("Nastala chyba při zapisování do deníku.");
-    } finally {
-      setIsJournalLoading(false);
-    }
-  };
-
-  async function loadGmailLoveLetters() {
-    if (!googleToken) return;
-    setIsLettersLoading(true);
-    try {
-      const list = await listLoveLetters(googleToken, 'subject:("Beru & FáFa") OR subject:("💌")');
-      setLoveLettersList(list);
-    } catch (err) {
-      console.error("Gmail loader error:", err);
-    } finally {
-      setIsLettersLoading(false);
-    }
-  }
-
-  const escapeHtml = (value: string) =>
-    value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-
-  const handleSendLoveLetter = async () => {
-    if (!googleToken || !partnerEmail.trim() || !emailMessage.trim()) return;
-    
-    const senderName = userRole === 'boyfriend' ? 'FáFa' : 'Beru';
-    const finalSubject = `💌 Beru & FáFa: ${emailSubject.trim()}`;
-    const safeEmailMessage = escapeHtml(emailMessage).replace(/\n/g, '<br/>');
-    
-    let templateHtml = ``;
-    if (emailTemplate === 'rose') {
-      templateHtml = `
-        <div style="font-family: 'Georgia', serif; background-color: #FFF0F2; padding: 40px; border-radius: 24px; max-width: 600px; margin: 0 auto; border: 2px solid #FFA3B1;">
-          <div style="text-align: center; font-size: 40px; margin-bottom: 20px;">🌹</div>
-          <h2 style="color: #9F1239; text-align: center; margin-bottom: 30px; border-bottom: 1px dashed #FFA3B1; padding-bottom: 15px;">Milostné psaní pro Tebe</h2>
-          <div style="font-size: 16px; color: #4C0519; line-height: 1.8; white-space: pre-wrap; background: white; padding: 25px; border-radius: 16px; border: 1px solid #FFE4E6; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">${safeEmailMessage}</div>
-          <div style="margin-top: 30px; text-align: right; font-style: italic; color: #9F1239; font-size: 18px; font-weight: bold;">
-            S nekonečnou láskou, <br/>
-            tvůj milující ${senderName} 💖
-          </div>
-          <div style="margin-top: 40px; border-top: 1px solid #FFE4E6; padding-top: 15px; text-align: center; font-size: 11px; color: #FDA4AF;">
-            Posláno s láskou z naší společné Romance aplikace ✨
-          </div>
-        </div>
-      `;
-    } else if (emailTemplate === 'starry') {
-      templateHtml = `
-        <div style="font-family: 'Courier New', monospace; background-color: #0F172A; padding: 40px; border-radius: 24px; max-width: 600px; margin: 0 auto; border: 2px solid #38BDF8; color: #F8FAFC;">
-          <div style="text-align: center; font-size: 40px; margin-bottom: 20px;">✨🌌</div>
-          <h2 style="color: #38BDF8; text-align: center; margin-bottom: 30px; border-bottom: 1px dashed #334155; padding-bottom: 15px;">Dopis napsaný ve hvězdách</h2>
-          <div style="font-size: 15px; color: #E2E8F0; line-height: 1.8; white-space: pre-wrap; background: #1E293B; padding: 25px; border-radius: 16px; border: 1px solid #334155;">${safeEmailMessage}</div>
-          <div style="margin-top: 30px; text-align: right; font-style: italic; color: #38BDF8; font-size: 18px; font-weight: bold;">
-            Tvá spřízněná duše, <br/>
-            ${senderName} 💫
-          </div>
-          <div style="margin-top: 40px; border-top: 1px solid #334155; padding-top: 15px; text-align: center; font-size: 11px; color: #64748B;">
-            Vesmírná Romance zpráva ✨
-          </div>
-        </div>
-      `;
-    } else {
-      templateHtml = `
-        <div style="font-family: 'Helvetica', sans-serif; background-color: #F8FAFC; padding: 40px; border-radius: 24px; max-width: 600px; margin: 0 auto; border: 2px solid #F1F5F9;">
-          <div style="text-align: center; font-size: 40px; margin-bottom: 20px;">❤️💌</div>
-          <h2 style="color: #0F172A; text-align: center; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 0.05em;">Moderní romantické vyznání</h2>
-          <div style="font-size: 16px; color: #334155; line-height: 1.8; white-space: pre-wrap; background: white; padding: 25px; border-radius: 16px; border: 1px solid #E2E8F0;">${safeEmailMessage}</div>
-          <div style="margin-top: 30px; text-align: right; font-weight: bold; color: #0F172A; font-size: 18px;">
-            Tvůj největší fanoušek, <br/>
-            ${senderName} 😍
-          </div>
-        </div>
-      `;
-    }
-
-    if (!(await requestConfirm({
-      title: 'Odeslat dopis?',
-      message: `Dopis se odešle z vaší Gmail adresy na ${partnerEmail}.`,
-      confirmText: 'Odeslat',
-    }))) return;
-
-    setIsSendingEmail(true);
-    try {
-      await sendEmailLoveLetter(googleToken, partnerEmail, finalSubject, templateHtml);
-      setEmailMessage('');
-      setEmailSubject('Milostný vzkazík... ❤️');
-      triggerAlert('Odesláno', 'Milostný dopis byl úspěšně odeslán přes Gmail.', '💌');
-      await loadGmailLoveLetters();
-    } catch (err) {
-      console.error(err);
-      triggerAlert('Chyba', 'Nastala chyba při odesílání dopisu přes Gmail.', '⚠️');
-    } finally {
-      setIsSendingEmail(false);
-    }
-  };
-
-  async function loadChatSpaces() {
-    if (!googleToken) return;
-    setIsChatSpacesLoading(true);
-    try {
-      const data = await listChatSpaces(googleToken);
-      if (data.spaces) {
-        setChatSpaces(data.spaces);
-        if (data.spaces.length > 0) {
-          setSelectedSpace(data.spaces[0].name);
-        }
-      }
-    } catch (err) {
-      console.error("Chat spaces loader error:", err);
-    } finally {
-      setIsChatSpacesLoading(false);
-    }
-  }
-
-  const handleSendChatMessage = async (presetText?: string) => {
-    const spaceToSend = selectedSpace.trim();
-    const messageToSend = presetText || customChatMessage;
-    if (!googleToken || !spaceToSend || !messageToSend.trim()) return;
-
-    const signature = userRole === 'boyfriend' ? 'FáFa' : 'Beru';
-    const textToSend = `💖 [Romance] Vzkaz od ${signature}: "${messageToSend.trim()}"`;
-
-    if (!(await requestConfirm({
-      title: 'Odeslat zprávu?',
-      message: 'Rychlý vzkaz se odešle do vybraného Google Chat prostoru.',
-      confirmText: 'Odeslat',
-    }))) return;
-
-    setIsSendingChatMessage(true);
-    try {
-      await sendChatMessage(googleToken, spaceToSend, textToSend);
-      if (!presetText) setCustomChatMessage('');
-      setChatStatus("Vzkaz byl úspěšně doručen do vašeho Google Chatu!");
-      setTimeout(() => setChatStatus(''), 4000);
-    } catch (err) {
-      console.error(err);
-      setChatStatus("Chyba při odesílání zprávy do chatu.");
-    } finally {
-      setIsSendingChatMessage(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      const res = await googleSignIn();
-      if (res) {
-        setGoogleUser(res.user);
-        setGoogleToken(res.accessToken);
-        triggerAlert('Přihlášeno', `Vítej v Google Workspace koutku, ${res.user.displayName || 'lásko'}.`, '✨');
-      }
-    } catch (err) {
-      console.error(err);
-      triggerAlert('Chyba přihlášení', 'Přihlášení přes Google se nepodařilo.', '⚠️');
-    }
-  };
-
-  const handleGoogleLogout = async () => {
-    if (!(await requestConfirm({
-      title: 'Odhlásit Google?',
-      message: 'Google Workspace funkce se do dalšího přihlášení odpojí.',
-      confirmText: 'Odhlásit',
-      isDestructive: true,
-    }))) return;
-    await googleLogout();
-    setGoogleUser(null);
-    setGoogleToken(null);
-  };
 
   // Floating Heart Particle state
   const [hearts, setHearts] = useState<FloatingHeart[]>([]);
   const nextHeartId = useRef(0);
+  const [isHeartPulsing, setIsHeartPulsing] = useState(false);
+
+  const handleMainHeartClick = (e: React.MouseEvent) => {
+    setIsHeartPulsing(true);
+    triggerHeartExplosion(e);
+    setTimeout(() => {
+      setIsHeartPulsing(false);
+    }, 1000);
+  };
 
   // Time counter state
   const [timeTogether, setTimeTogether] = useState({
@@ -495,15 +239,7 @@ export default function RomanceApp() {
     totalSeconds: 0
   });
 
-  // AI Poet State
-  const [generatorCategory, setGeneratorCategory] = useState<string>('poem');
-  const [generatorPrompt, setGeneratorPrompt] = useState<string>('');
-  const [generatedPoem, setGeneratedPoem] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [copySuccess, setCopySuccess] = useState<boolean>(false);
-  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
-
-  // Custom modal dialog states for PWA-friendly confirmations and notices.
+  // Custom Confirm & Alert Dialogs States (Fixes sandbox iframe window.confirm/alert blocks!)
   interface CustomConfirmConfig {
     title: string;
     message: string;
@@ -511,7 +247,6 @@ export default function RomanceApp() {
     cancelText?: string;
     isDestructive?: boolean;
     onConfirm: () => void;
-    onCancel?: () => void;
   }
   const [customConfirm, setCustomConfirm] = useState<CustomConfirmConfig | null>(null);
   
@@ -525,22 +260,6 @@ export default function RomanceApp() {
 
   const triggerAlert = (title: string, message: string, icon = '✨') => {
     setCustomAlert({ title, message, icon });
-  };
-
-  const requestConfirm = (config: Omit<CustomConfirmConfig, 'onConfirm'>): Promise<boolean> => {
-    return new Promise((resolve) => {
-      setCustomConfirm({
-        ...config,
-        onConfirm: () => {
-          setCustomConfirm(null);
-          resolve(true);
-        },
-        onCancel: () => {
-          setCustomConfirm(null);
-          resolve(false);
-        },
-      });
-    });
   };
 
   // Naše místa (Special Places) Default Data
@@ -728,8 +447,6 @@ export default function RomanceApp() {
     }, 0);
 
     return () => clearTimeout(timer);
-    // Defaults are written once on mount from the initial localStorage-backed state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save changes wrapper
@@ -796,15 +513,19 @@ export default function RomanceApp() {
     return () => cancelAnimationFrame(frame);
   }, [hearts]);
 
-  const triggerHeartExplosion = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    // Use target coords or mouse click coordinate
+  const triggerHeartExplosion = (e: React.MouseEvent | { clientX: number, clientY: number }) => {
     let originX = e.clientX;
     let originY = e.clientY;
 
     if (!originX || !originY) {
-      originX = rect.left + rect.width / 2;
-      originY = rect.top + rect.height / 2;
+      if ('currentTarget' in e && e.currentTarget) {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        originX = rect.left + rect.width / 2;
+        originY = rect.top + rect.height / 2;
+      } else {
+        originX = window.innerWidth / 2;
+        originY = window.innerHeight / 2;
+      }
     }
 
     const newParticles: FloatingHeart[] = Array.from({ length: 18 }).map(() => {
@@ -825,238 +546,6 @@ export default function RomanceApp() {
     });
 
     setHearts((prev) => [...prev, ...newParticles]);
-  };
-
-  // ---- AI POET SERVICE INTEGRATION ----
-  const generateLoveText = async () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-    setGeneratedPoem('');
-    setSaveSuccess(false);
-
-    try {
-      const response = await fetch('/api/poetry', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          category: generatorCategory,
-          customInput: generatorPrompt
-        }),
-      });
-
-      const data = await response.json();
-      if (response.ok && data.text) {
-        setGeneratedPoem(data.text);
-      } else {
-        setGeneratedPoem(
-          data.error || "Miláčku, básník má zrovna tvůrčí krizi a skládá verše v hlavě. Vyzkoušej to za moment! ❤️"
-        );
-      }
-    } catch (err) {
-      console.error(err);
-      setGeneratedPoem("Nepodařilo se nám propojit s vesmírným básníkem. Zkontroluj prosím připojení a zkus to znovu za chvilku. Spoustu lásky, tvůj FáFa! ❤️");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const copyToClipboard = () => {
-    if (!generatedPoem) return;
-    navigator.clipboard.writeText(generatedPoem);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
-  };
-
-  // Share using Web Share API
-  const shareLoveText = async () => {
-    if (!generatedPoem) return;
-    
-    // Fallback if unsupported
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Milostné vyznání',
-          text: generatedPoem,
-        });
-      } catch (err) {
-        console.error("Chyba při sdílení", err);
-      }
-    } else {
-      copyToClipboard();
-      triggerAlert('Zkopírováno', 'Text vyznání je ve schránce a můžeš jej poslat v libovolné aplikaci.', '📋');
-    }
-  };
-
-  // Canvas-based graphic card download (1080x1080 resolution, highly optimized)
-  const downloadLoveCard = () => {
-    if (!generatedPoem) return;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 1080;
-    canvas.height = 1080;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Background Gradient - Premium pink/raspberry radial blush
-    const grad = ctx.createRadialGradient(540, 540, 100, 540, 540, 700);
-    grad.addColorStop(0, '#FFF1F2'); // rose-50
-    grad.addColorStop(0.5, '#FFE4E6'); // rose-100
-    grad.addColorStop(1, '#FECDD3'); // rose-200
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 1080, 1080);
-
-    // Decorative floating hearts on background canvas
-    ctx.save();
-    ctx.textAlign = 'center';
-    
-    // Draw romantic patterns/heart stamps
-    const heartStamps = [
-      { x: 150, y: 150, r: 40 }, { x: 930, y: 180, r: 60 },
-      { x: 100, y: 900, r: 70 }, { x: 950, y: 880, r: 45 },
-      { x: 540, y: 100, r: 35 }, { x: 540, y: 980, r: 50 }
-    ];
-    
-    ctx.fillStyle = 'rgba(244, 63, 94, 0.08)'; // rose-500 opaque
-    heartStamps.forEach((h) => {
-      ctx.font = `${h.r}px Arial`;
-      ctx.fillText('❤️', h.x, h.y);
-    });
-    ctx.restore();
-
-    // Canvas Card Border
-    ctx.lineWidth = 16;
-    ctx.strokeStyle = '#FDA4AF'; // rose-300
-    ctx.strokeRect(40, 40, 1000, 1000);
-
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#F43F5E'; // rose-500
-    ctx.strokeRect(60, 60, 960, 960);
-
-    // Dynamic Title
-    ctx.save();
-    ctx.fillStyle = '#9F1239'; // rose-800
-    ctx.font = 'bold 54px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Pro moji milovanou Michaelku', 540, 190);
-    ctx.restore();
-
-    // Small heart icon below title
-    ctx.save();
-    ctx.fillStyle = '#E11D48'; // rose-600
-    ctx.font = '64px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('❤️', 540, 270);
-    ctx.restore();
-
-    // Text Wrapping for generated poem
-    ctx.save();
-    ctx.fillStyle = '#4C0519'; // rose-950 / deep charcoal
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'italic 36px Times New Roman, Georgia, serif';
-
-    const words = generatedPoem.split('\n');
-    let lineSpacing = 50;
-    let startY = 360;
-
-    // Draw lines centered
-    words.forEach((line, i) => {
-      if (line.trim() !== "") {
-        ctx.fillText(line, 540, startY + (i * lineSpacing));
-      }
-    });
-    ctx.restore();
-
-    // Signature at the bottom of card
-    ctx.save();
-    ctx.fillStyle = '#BE123C'; // rose-700
-    ctx.font = 'bold 32px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Z milujícího srdce na věky • od 3.4.2026', 540, 920);
-    
-    ctx.font = '24px Arial, sans-serif';
-    ctx.fillStyle = '#9F1239';
-    ctx.fillText('FáFa & Beru • naše společná appka', 540, 960);
-    ctx.restore();
-
-    // Trigger Download of canvas image
-    const dataURL = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = `vzkaz_pro_beru_${Date.now()}.png`;
-    link.href = dataURL;
-    link.click();
-  };
-
-  // Convert canvas graphic directly to Photo format and save to Naše Galerie!
-  const saveAiCardToGallery = () => {
-    if (!generatedPoem) return;
-
-    // We do exactly the canvas draw, then export to local base64 gallery photo
-    const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 600;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Gradient background
-    const grad = ctx.createRadialGradient(300, 300, 50, 300, 300, 400);
-    grad.addColorStop(0, '#FFF1F2');
-    grad.addColorStop(1, '#FFE4E6');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 600, 600);
-
-    // Decorative
-    ctx.fillStyle = 'rgba(244, 63, 94, 0.05)';
-    ctx.font = '100px Arial';
-    ctx.fillText('❤️', 250, 300);
-
-    // Title
-    ctx.fillStyle = '#881337';
-    ctx.font = 'bold 24px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Zamilovaný AI lístek', 300, 80);
-
-    // Divider
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#FECDD3';
-    ctx.beginPath();
-    ctx.moveTo(100, 110);
-    ctx.lineTo(500, 110);
-    ctx.stroke();
-
-    // Verse lines
-    ctx.fillStyle = '#4C0519';
-    ctx.font = 'italic 16px Georgia, serif';
-    const lines = generatedPoem.split('\n');
-    lines.forEach((line, i) => {
-      if (i < 15 && line.trim() !== "") {
-        ctx.fillText(line, 300, 160 + (i * 24));
-      }
-    });
-
-    // Date met footer banner
-    ctx.fillStyle = '#9F1239';
-    ctx.font = 'semibold 13px Arial, sans-serif';
-    ctx.fillText('Uloženo z našeho AI básníka • 3.4.2026', 300, 540);
-
-    const base64Img = canvas.toDataURL('image/jpeg', 0.85);
-
-    const newPhoto: Photo = {
-      id: `ai_card_${Date.now()}`,
-      url: base64Img,
-      caption: `AI Báseň: ${generatedPoem.substring(0, 40)}... generovaná s láskou pro Michaelku.`,
-      date: new Date().toISOString().split('T')[0],
-      isFavorite: true
-    };
-
-    const updatedGallery = [newPhoto, ...galleryPhotos];
-    setGalleryPhotos(updatedGallery);
-    saveState('love_gallery', updatedGallery);
-
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
   };
 
   // ---- PERSISTENT IMAGE GALLERY COMPRESSION & UPLOAD ----
@@ -1195,6 +684,9 @@ export default function RomanceApp() {
     const updatedNotes = [newNote, ...notes];
     setNotes(updatedNotes);
     saveState('love_notes', updatedNotes);
+    
+    // Dispatch Firebase Local Notification
+    sendNotification('note', `Máš nový zamilovaný vzkaz od ${authorSignature}!`);
 
     // Reset fields
     setNewNoteText('');
@@ -1270,6 +762,9 @@ export default function RomanceApp() {
     const updated = [newMiles, ...milestones].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     setMilestones(updated);
     saveState('love_milestones', updated);
+
+    const signature = userRole === 'boyfriend' ? 'FáFa' : 'Beru';
+    sendNotification('milestone', `${signature} přidal(a) nový milník do vašeho kalendáře lásky: ${newMilestoneTitle.trim()}!`);
 
     // Reset values
     setNewMilestoneTitle('');
@@ -1349,8 +844,22 @@ export default function RomanceApp() {
 
 
   // Show absolute placeholder loader if client states aren't finished
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F7] flex items-center justify-center">
+        <Heart className="w-12 h-12 text-[#FF2D55] animate-pulse" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#F2F2F7] text-gray-800 font-sans selection:bg-[#FF2D55]/25" id="romance-layout">
+    <div className="min-h-[100dvh] bg-transparent text-gray-800 font-sans selection:bg-[#FF2D55]/25 flex items-center justify-center p-0 sm:py-0 relative" id="romance-layout">
+      {/* Ambient background glow layers */}
+      <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-gradient-to-tr from-[#FF2D55]/10 to-[#FFA07A]/10 blur-3xl opacity-70" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-gradient-to-bl from-[#FF5E7E]/10 to-[#FF9A9E]/10 blur-3xl opacity-60" />
+      </div>
+
       {/* Dynamic heart particle overlay layer */}
       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden" id="heart-explosion-layer">
         {hearts.map((h) => (
@@ -1369,14 +878,14 @@ export default function RomanceApp() {
         ))}
       </div>
 
-      {/* Mobile-first PWA shell */}
-      <div className="min-h-dvh w-full max-w-3xl mx-auto bg-[#F2F2F7] relative overflow-x-hidden flex flex-col transition-all" id="app-shell">
+      {/* Main PWA Outer Wrapper */}
+      <div className="w-full max-w-[480px] mx-auto bg-white/40 backdrop-blur-2xl relative flex flex-col h-[100dvh] sm:shadow-2xl sm:border sm:border-white/60 sm:rounded-2xl transition-all overflow-hidden" id="device-shell">
 
         {/* Dynamic iOS Sticky Header Banner */}
-        <div className="bg-white border-b border-[#D1D1D6]/80 text-[#1C1C1E] px-5 py-3 flex flex-col gap-2 shrink-0 relative shadow-xs" id="sticky-header">
+        <div className="bg-white/60 backdrop-blur-md border-b border-white/50 text-[#1C1C1E] px-5 py-3 flex flex-col gap-2 shrink-0 relative shadow-sm" id="sticky-header">
           <div className="w-full flex justify-between items-center">
             {/* Context adapters switch roles instantly */}
-            <div className="flex bg-[#F2F2F7] rounded-full p-0.5 border border-[#E5E5EA] text-xs" id="role-selector">
+            <div className="flex bg-white/50 backdrop-blur-sm rounded-full p-0.5 border border-white/40 text-xs shadow-inner" id="role-selector">
               <button
                 type="button"
                 id="role-boy"
@@ -1448,7 +957,7 @@ export default function RomanceApp() {
                     if (syncCodeInput.trim().length > 3) {
                       setRelationshipCode(syncCodeInput.trim().toUpperCase());
                       setSyncCodeInput('');
-                      triggerAlert('Propojeno', 'Váš láskyplný prostor byl úspěšně synchronizován.', '💖');
+                      alert("Váš láskyplný prostor byl úspěšně synchronizován a propojen! 💖");
                     }
                   }}
                   className="bg-[#FF2D55] hover:bg-[#FF2D55]/90 text-white px-3 py-1.5 rounded-lg font-bold transition-all text-xs shadow-xs"
@@ -1461,7 +970,7 @@ export default function RomanceApp() {
         </div>
 
         {/* Scrollable View Area Frame */}
-        <div className="flex-1 overflow-y-auto px-4 py-5 pb-28 relative" id="scroll-workspace">
+        <div className="flex-1 overflow-y-auto px-4 py-5 pb-24 relative custom-ios-scroll" id="scroll-workspace">
           
           <AnimatePresence mode="wait">
             {/* TAB 1: COUNTER (LÁSKA) */}
@@ -1476,41 +985,63 @@ export default function RomanceApp() {
                 id="counter-tab"
               >
                 
-                {/* Visual relationship circle frame */}
+                {/* Visual relationship circle frame - Premium glassmorphic look */}
                 <div 
-                  className="bg-white rounded-[24px] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#E5E5EA] flex flex-col items-center relative text-center"
+                  className="bg-white/30 backdrop-blur-3xl rounded-[32px] p-8 shadow-[0_12px_40px_rgba(255,45,85,0.12)] border-t border-l border-white/80 border-b border-r border-[#FF2D55]/10 flex flex-col items-center relative text-center overflow-hidden"
                   id="countdown-card"
                 >
-                  <span className="text-xs uppercase tracking-widest text-[#8E8E93] font-bold mb-1">Slavíme naši lásku</span>
-                  <h3 className="font-sans text-gray-950 font-extrabold text-xl tracking-tight mb-4">Milujeme se spolu už</h3>
+                  <div className="absolute -top-24 -left-24 w-48 h-48 bg-gradient-to-br from-pink-300 to-rose-400 rounded-full blur-[60px] opacity-40 mix-blend-multiply" />
+                  <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-gradient-to-tl from-orange-200 to-[#FF2D55] rounded-full blur-[60px] opacity-30 mix-blend-multiply" />
+
+                  <span className="text-[10px] uppercase tracking-[0.3em] text-[#FF2D55] font-black mb-2 relative z-10 drop-shadow-sm/50">Naše Cesta Cestou</span>
+                  <h3 className="font-serif text-gray-900 font-bold text-2xl tracking-tight mb-8 relative z-10 drop-shadow-sm">Milujeme se spolu už</h3>
 
                   {/* Pulsing Central Lovable Heart Widget */}
-                  <div className="relative cursor-pointer my-2 select-none group" onClick={triggerHeartExplosion} id="pulse-heart-anchor">
+                  <motion.div 
+                    className="relative cursor-pointer my-4 select-none group z-10" 
+                    onClick={handleMainHeartClick} 
+                    id="pulse-heart-anchor"
+                    initial={{ scale: 1 }}
+                    animate={isHeartPulsing ? { scale: [1, 1.4, 0.9, 1.2, 1] } : { scale: [1, 1.02, 1] }}
+                    transition={isHeartPulsing ? { duration: 1, ease: "easeInOut" } : { duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  >
                     {/* Ring glow element */}
-                    <div className="absolute inset-0 bg-[#FF2D55]/20 rounded-full scale-120 blur-md animate-ping" />
-                    <div className="w-36 h-36 bg-gradient-to-tr from-[#FF2D55] to-[#FF5E7E] rounded-full shadow-lg border-4 border-white flex flex-col justify-center items-center transition-transform active:scale-95 duration-75 relative z-10">
-                      <Heart className="w-14 h-14 text-white fill-white animate-pulse" />
-                      <span className="text-white text-lg font-extrabold font-mono mt-1">{timeTogether.days} dní</span>
+                    <AnimatePresence>
+                      {isHeartPulsing && (
+                        <motion.div 
+                          initial={{ opacity: 0.8, scale: 1 }}
+                          animate={{ opacity: 0, scale: 2 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 1, ease: "easeOut" }}
+                          className="absolute inset-0 bg-gradient-to-tr from-[#FF2D55] to-[#FFA07A] rounded-full blur-2xl"
+                        />
+                      )}
+                    </AnimatePresence>
+                    {!isHeartPulsing && <div className="absolute inset-0 bg-[#FF2D55]/20 rounded-full scale-[1.3] blur-2xl animate-pulse" />}
+                    
+                    <div className="w-40 h-40 bg-gradient-to-tr from-[#E11D48] via-[#FF2D55] to-[#FDA4AF] rounded-full shadow-[0_0_50px_rgba(255,45,85,0.5),inset_0_4px_12px_rgba(255,255,255,0.4)] border border-white/60 flex flex-col justify-center items-center relative z-10 backdrop-blur-md transition-all">
+                      <Heart className={`w-16 h-16 text-white fill-white ${isHeartPulsing ? 'animate-ping' : ''}`} style={{ filter: 'drop-shadow(0px 4px 8px rgba(0,0,0,0.2))' }} />
+                      <span className="text-white text-2xl font-black font-mono mt-2 drop-shadow-md tracking-tighter">{timeTogether.days} dní</span>
                     </div>
                     {/* Tiny visual guidance badge */}
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-gray-905 text-white text-[9px] px-2 py-0.5 rounded-full font-bold shadow-md opacity-85 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      Ťukni pro lásku 💖
+                    <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-white/60 backdrop-blur-xl border border-white text-[#E11D48] text-[9px] px-4 py-1.5 rounded-full font-black shadow-lg opacity-80 group-hover:opacity-100 transition-opacity whitespace-nowrap tracking-wider">
+                      ŤUKNI SI 💖
                     </span>
-                  </div>
+                  </motion.div>
 
                   {/* Subtitle counter grid */}
-                  <div className="grid grid-cols-3 gap-2 w-full mt-6" id="precise-time-grid">
-                    <div className="bg-[#F2F2F7] rounded-[16px] p-2.5 flex flex-col items-center border border-[#E5E5EA]">
-                      <span className="font-mono text-xl font-bold text-gray-900">{timeTogether.hours}</span>
-                      <span className="text-[10px] text-[#8E8E93] font-semibold font-sans">Hodiny</span>
+                  <div className="grid grid-cols-3 gap-4 w-full mt-10 relative z-10" id="precise-time-grid">
+                    <div className="bg-white/50 backdrop-blur-xl rounded-[20px] p-4 flex flex-col items-center border-t border-l border-white/90 shadow-md">
+                      <span className="font-mono text-2xl font-black text-gray-900 drop-shadow-sm">{timeTogether.hours}</span>
+                      <span className="text-[9px] text-[#FF2D55] font-black uppercase tracking-widest mt-1">Hodiny</span>
                     </div>
-                    <div className="bg-[#F2F2F7] rounded-[16px] p-2.5 flex flex-col items-center border border-[#E5E5EA]">
-                      <span className="font-mono text-xl font-bold text-gray-900">{timeTogether.minutes}</span>
-                      <span className="text-[10px] text-[#8E8E93] font-semibold font-sans">Minuty</span>
+                    <div className="bg-white/50 backdrop-blur-xl rounded-[20px] p-4 flex flex-col items-center border-t border-l border-white/90 shadow-md">
+                      <span className="font-mono text-2xl font-black text-gray-900 drop-shadow-sm">{timeTogether.minutes}</span>
+                      <span className="text-[9px] text-[#FF2D55] font-black uppercase tracking-widest mt-1">Minuty</span>
                     </div>
-                    <div className="bg-[#F2F2F7] rounded-[16px] p-2.5 flex flex-col items-center border border-[#E5E5EA]">
-                      <span className="font-mono text-xl font-bold text-gray-900">{timeTogether.seconds}</span>
-                      <span className="text-[10px] text-[#8E8E93] font-semibold font-sans">Sekundy</span>
+                    <div className="bg-white/50 backdrop-blur-xl rounded-[20px] p-4 flex flex-col items-center border-t border-l border-white/90 shadow-md">
+                      <span className="font-mono text-2xl font-black text-gray-900 drop-shadow-sm">{timeTogether.seconds}</span>
+                      <span className="text-[10px] text-gray-700 font-semibold font-sans uppercase tracking-wider">Sekundy</span>
                     </div>
                   </div>
 
@@ -1520,12 +1051,12 @@ export default function RomanceApp() {
                 </div>
 
                 {/* Personal Adapted Card */}
-                <div className="bg-white text-gray-900 border border-[#E5E5EA] rounded-[24px] p-6 shadow-[0_4px_20px_rgba(0,0,0,0.05)] relative overflow-hidden" id="personalized-greeting-card">
+                <div className="bg-white/70 backdrop-blur-xl text-gray-900 border border-white/60 rounded-[24px] p-6 shadow-[0_8px_32px_rgba(255,45,85,0.06)] relative overflow-hidden" id="personalized-greeting-card">
                   {/* Backdrop glowing patterns */}
-                  <div className="absolute right-0 top-0 w-32 h-32 bg-[#FF2D55]/5 rounded-full blur-xl pointer-events-none" />
+                  <div className="absolute right-0 top-0 w-40 h-40 bg-gradient-to-br from-[#FF2D55]/10 to-[#FFA07A]/10 rounded-full blur-2xl pointer-events-none" />
                   
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="bg-[#FFE5E9] text-[#FF2D55] px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-widest border border-[#FFF1F2]">
+                  <div className="flex justify-between items-start mb-4 relative z-10">
+                    <div className="bg-white/80 backdrop-blur-md text-[#FF2D55] px-4 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-widest border border-white/60 shadow-sm">
                       Osobní prostor
                     </div>
                     <Sparkles className="w-5 h-5 text-[#FF2D55]" />
@@ -1901,7 +1432,6 @@ export default function RomanceApp() {
                           >
                             <div className="relative aspect-square overflow-hidden bg-[#F2F2F7] flex items-center justify-center">
                               {/* Native referrer check applied according to guidelines */}
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={p.url}
                                 alt={p.caption}
@@ -1962,7 +1492,6 @@ export default function RomanceApp() {
                             </button>
 
                             <div className="max-w-md max-h-[480px] w-full h-full relative flex items-center justify-center">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={filteredPhotos[lightboxIndex]?.url}
                                 alt={filteredPhotos[lightboxIndex]?.caption}
@@ -2401,7 +1930,7 @@ export default function RomanceApp() {
                     <button
                       type="button"
                       onClick={() => setShowAddPlace(true)}
-                      className="bg-white hover:bg-gray-50 text-gray-700 font-bold py-3 px-4 rounded-[16px] text-xs border border-[#E5E5EA] shadow-2xs transition-all flex items-center justify-center gap-2"
+                      className="bg-white hover:bg-gray-50 text-gray-750 font-bold py-3 px-4 rounded-[16px] text-xs border border-[#E5E5EA] shadow-2xs transition-all flex items-center justify-center gap-2"
                     >
                       <Plus className="w-4 h-4 text-[#FF2D55]" />
                       <span>Zaznamenat další naše rande</span>
@@ -2750,62 +2279,90 @@ export default function RomanceApp() {
                     {/* SUB-TAB 3: Google Chat Bleskový chat */}
                     {workspaceSubTab === 'chat' && (
                       <div className="flex flex-col gap-4 animate-in fade-in duration-200">
-                        <div className="bg-white rounded-[24px] p-5 shadow-3xs border border-[#E5E5EA] flex flex-col gap-4">
-                          <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-widest text-[#FF2D55]">Google Chat bleskový ping 💬</h4>
-                          
-                          <div className="flex flex-col gap-3">
-                            <label className="text-[10px] uppercase font-extrabold text-[#8E8E93]">Vyberte komunikační prostor:</label>
-                            <input
-                              type="text"
-                              placeholder="Název prostoru (např. spaces/love_room)"
-                              className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800 font-mono"
-                              value={selectedSpace}
-                              onChange={(e) => setSelectedSpace(e.target.value)}
-                            />
+                        {chatSpacesError ? (
+                          <div className="bg-[#FFF0F0] rounded-[24px] p-5 shadow-3xs border border-[#FF3B30]/30 flex flex-col gap-2 relative">
+                            <h4 className="font-extrabold text-[11px] text-[#FF3B30] uppercase tracking-widest">Google Chat integrace omezena</h4>
+                            <p className="text-[10px] text-gray-800 font-medium">Bohužel tvůj Google Workspace účet nemá povolen Google Chat, nebo došlo k jiné chybě:</p>
+                            <p className="text-[10px] font-mono text-[#FF3B30]/80 p-2 bg-[#FF3B30]/5 rounded-[8px]">{chatSpacesError}</p>
+                            <p className="text-[9px] text-[#8E8E93] mt-2">Doporučujeme kontaktovat správce vašeho Google Workspace účtu (https://support.google.com/a/answer/9071576).</p>
+                          </div>
+                        ) : (
+                          <div className="bg-white rounded-[24px] p-5 shadow-3xs border border-[#E5E5EA] flex flex-col gap-4">
+                            <h4 className="font-extrabold text-xs text-gray-900 uppercase tracking-widest text-[#FF2D55]">Google Chat bleskový ping 💬</h4>
                             
-                            <input
-                              type="text"
-                              placeholder="Krátký rychlý vzkaz k vypálení..."
-                              className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800"
-                              value={customChatMessage}
-                              onChange={(e) => setCustomChatMessage(e.target.value)}
-                            />
-
-                            <button
-                              type="button"
-                              onClick={() => handleSendChatMessage()}
-                              className="bg-gray-900 hover:bg-gray-800 text-white font-bold py-3 rounded-[14px] text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
-                            >
-                              <MessageCircle className="w-4 h-4 text-[#FF2D55]" />
-                              <span>Odeslat ping do Google Chatu</span>
-                            </button>
-
-                            {/* Quick Romantic presets */}
-                            <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-gray-100">
-                              <span className="text-[9px] uppercase font-bold text-[#8E8E93]">Romantické rychloklepky (okamžité odeslání):</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {[
-                                  "Myslím na tebe! 🥰", 
-                                  "Miluju tě, Beru! ❤️", 
-                                  "FáFa tě moc pusinkuje! 😘",
-                                  "Chybíš mi! 🥺"
-                                ].map((preset, idx) => (
-                                  <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={() => {
-                                      setCustomChatMessage(preset);
-                                      triggerAlert("Připraveno", `Vzkaz "${preset}" byl vybrán. Můžeš jej odeslat tlačítkem výše!`, "💬");
-                                    }}
-                                    className="bg-red-50 hover:bg-[#FFE5E9] text-[#FF2D55] text-[10px] font-bold px-3 py-1.5 rounded-full transition-all border border-[#FF2D55]/10"
+                            <div className="flex flex-col gap-3">
+                              <label className="text-[10px] uppercase font-extrabold text-[#8E8E93]">Vyberte komunikační prostor:</label>
+                              <div className="flex flex-col gap-1">
+                                {isChatSpacesLoading ? (
+                                  <div className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2 rounded-[12px] flex items-center justify-center gap-2">
+                                     <Loader2 className="w-3.5 h-3.5 animate-spin text-[#8E8E93]" />
+                                     <span className="text-xs text-[#8E8E93]">Načítání prostorů...</span>
+                                  </div>
+                                ) : chatSpaces.length > 0 ? (
+                                  <select 
+                                    className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800 truncate"
+                                    value={selectedSpace}
+                                    onChange={(e) => setSelectedSpace(e.target.value)}
                                   >
-                                    {preset}
-                                  </button>
-                                ))}
+                                    {chatSpaces.map(space => (
+                                      <option key={space.name} value={space.name}>{space.displayName || space.name}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    placeholder="Název prostoru (např. spaces/love_room)"
+                                    className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800 font-mono"
+                                    value={selectedSpace}
+                                    onChange={(e) => setSelectedSpace(e.target.value)}
+                                  />
+                                )}
+                              </div>
+                              
+                              <input
+                                type="text"
+                                placeholder="Krátký rychlý vzkaz k vypálení..."
+                                className="bg-[#F2F2F7] border border-[#E5E5EA] px-3.5 py-2.5 rounded-[12px] text-xs w-full focus:ring-1 focus:ring-[#FF2D55] text-gray-800"
+                                value={customChatMessage}
+                                onChange={(e) => setCustomChatMessage(e.target.value)}
+                              />
+  
+                              <button
+                                type="button"
+                                onClick={() => handleSendChatMessage()}
+                                className="bg-gray-900 hover:bg-gray-800 text-white font-bold py-3 rounded-[14px] text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
+                              >
+                                <MessageCircle className="w-4 h-4 text-[#FF2D55]" />
+                                <span>Odeslat ping do Google Chatu</span>
+                              </button>
+  
+                              {/* Quick Romantic presets */}
+                              <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-gray-100">
+                                <span className="text-[9px] uppercase font-bold text-[#8E8E93]">Romantické rychloklepky (okamžité odeslání):</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {[
+                                    "Myslím na tebe! 🥰", 
+                                    "Miluju tě, Beru! ❤️", 
+                                    "FáFa tě moc pusinkuje! 😘",
+                                    "Chybíš mi! 🥺"
+                                  ].map((preset, idx) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={() => {
+                                        setCustomChatMessage(preset);
+                                        triggerAlert("Připraveno", `Vzkaz "${preset}" byl vybrán. Můžeš jej odeslat tlačítkem výše!`, "💬");
+                                      }}
+                                      className="bg-red-50 hover:bg-[#FFE5E9] text-[#FF2D55] text-[10px] font-bold px-3 py-1.5 rounded-full transition-all border border-[#FF2D55]/10"
+                                    >
+                                      {preset}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2832,36 +2389,25 @@ export default function RomanceApp() {
                 {/* The Launchpad grid */}
                 <div className="grid grid-cols-2 gap-3.5" id="ios-launchpad-grid">
                   <div
-                    onClick={() => setActiveTab(Tab.WORKSPACE)}
-                    className="bg-white p-5 rounded-[24px] border border-[#E5E5EA] shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col items-center text-center gap-2"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 text-lg">
-                      ☁️
-                    </div>
-                    <span className="font-extrabold text-xs text-gray-900 leading-none">Google Koutek</span>
-                    <span className="text-[9px] text-[#8E8E93] leading-tight">Docs, Gmail & Chat propojení</span>
-                  </div>
-
-                  <div
                     onClick={() => setActiveTab(Tab.TIMELINE)}
-                    className="bg-white p-5 rounded-[24px] border border-[#E5E5EA] shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col items-center text-center gap-2"
+                    className="bg-white/40 backdrop-blur-md p-5 rounded-[24px] border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center gap-2"
                   >
-                    <div className="w-10 h-10 rounded-full bg-pink-50 flex items-center justify-center text-[#FF2D55] text-lg">
+                    <div className="w-10 h-10 rounded-full bg-pink-100/80 flex items-center justify-center text-[#FF2D55] text-lg">
                       📅
                     </div>
-                    <span className="font-extrabold text-xs text-gray-900 leading-none">Společný kalendář</span>
-                    <span className="text-[9px] text-[#8E8E93] leading-tight">Naše milníky v čase</span>
+                    <span className="font-extrabold text-xs text-gray-900 leading-none drop-shadow-sm">Společný kalendář</span>
+                    <span className="text-[9px] text-gray-600 leading-tight">Naše milníky v čase</span>
                   </div>
 
                   <div
                     onClick={() => setActiveTab(Tab.MESSAGE_BOARD)}
-                    className="bg-white p-5 rounded-[24px] border border-[#E5E5EA] shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col items-center text-center gap-2 col-span-2"
+                    className="bg-white/40 backdrop-blur-md p-5 rounded-[24px] border border-white/50 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col items-center text-center gap-2"
                   >
-                    <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 text-lg">
+                    <div className="w-10 h-10 rounded-full bg-amber-100/80 flex items-center justify-center text-amber-600 text-lg">
                       💌
                     </div>
-                    <span className="font-extrabold text-xs text-gray-900 leading-none">Nástěnka sladkých vzkazů</span>
-                    <span className="text-[9px] text-[#8E8E93] leading-tight">Posílejte si sladké lístečky a lepte je na zeď</span>
+                    <span className="font-extrabold text-xs text-gray-900 leading-none drop-shadow-sm">Nástěnka sladkých vzkazů</span>
+                    <span className="text-[9px] text-gray-600 leading-tight">Zamilované lístečky lásky</span>
                   </div>
                 </div>
 
@@ -2881,10 +2427,20 @@ export default function RomanceApp() {
                   </ol>
                 </div>
 
+                {/* PayPal Donation Fund */}
+                <div className="bg-white rounded-[24px] p-5 shadow-3xs border border-[#E5E5EA] flex flex-col gap-3 text-center items-center">
+                  <h4 className="font-extrabold text-[11px] text-gray-900 uppercase tracking-widest text-[#FF2D55] flex items-center justify-center gap-1">
+                    <Heart className="w-3.5 h-3.5" /> Společný fond rande
+                  </h4>
+                  <p className="text-[10px] text-gray-600 leading-relaxed font-sans max-w-[200px] mb-2">
+                    Máte rádi tuto aplikaci? Přispějte nám na kávu nebo společné rande přes PayPal!
+                  </p>
+                  <PayPalButton />
+                </div>
+
                 {/* Professional vCard Metadata Author Signature */}
                 <div className="bg-[#FFE5E3]/10 rounded-[24px] p-5 border border-[#FF2D55]/10 mt-2 flex flex-col gap-3" id="vcard-author">
                   <div className="flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src="https://fkdev.xyz/pwa-icon-512.png"
                       alt="František Kalášek Logo"
@@ -2924,8 +2480,8 @@ export default function RomanceApp() {
 
         </div>
 
-        {/* Native bottom navigation for PWA/mobile */}
-        <div className="fixed bottom-0 left-1/2 w-full max-w-3xl -translate-x-1/2 bg-white/95 backdrop-blur-md border-t border-gray-100 px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] flex justify-between items-center z-40 min-h-16 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]" id="ios-bottom-nav">
+        {/* Beautiful Elegant Native Bottom iOS Navigation Panel with 5 columns for phone view */}
+        <div style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }} className="absolute bottom-0 inset-x-0 bg-white/50 backdrop-blur-3xl saturate-150 border-t border-white/40 pt-2.5 px-3 flex justify-between items-center z-40 h-[calc(64px+env(safe-area-inset-bottom))] shrink-0 shadow-[0_-4px_24px_rgba(0,0,0,0.02)]" id="ios-bottom-nav">
           
           <button
             type="button"
@@ -2937,18 +2493,6 @@ export default function RomanceApp() {
           >
             <Heart className={`w-4.5 h-4.5 ${activeTab === Tab.LOVE_COUNTER ? 'fill-[#FF2D55]' : ''}`} />
             <span className="text-[8px] font-black tracking-tight leading-none mt-0.5">Miláček</span>
-          </button>
-
-          <button
-            type="button"
-            id="nav-poet"
-            onClick={() => setActiveTab(Tab.AI_POET)}
-            className={`flex flex-col items-center gap-1 transition-all text-center flex-1 max-w-[65px] ${
-              activeTab === Tab.AI_POET ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
-            }`}
-          >
-            <Sparkles className={`w-4.5 h-4.5 ${activeTab === Tab.AI_POET ? 'fill-[#FF2D55]' : ''}`} />
-            <span className="text-[8px] font-black tracking-tight leading-none mt-0.5">Básník</span>
           </button>
 
           <button
@@ -2980,7 +2524,7 @@ export default function RomanceApp() {
             id="nav-more"
             onClick={() => setActiveTab(Tab.MORE)}
             className={`flex flex-col items-center gap-1 transition-all text-center flex-1 max-w-[65px] ${
-              (activeTab === Tab.MORE || activeTab === Tab.WORKSPACE || activeTab === Tab.TIMELINE || activeTab === Tab.MESSAGE_BOARD) ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
+              (activeTab === Tab.MORE || activeTab === Tab.TIMELINE || activeTab === Tab.MESSAGE_BOARD) ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
             }`}
           >
             <Menu className="w-4.5 h-4.5" />
@@ -3007,10 +2551,7 @@ export default function RomanceApp() {
                 <div className="flex border-t border-gray-200/50 h-11 shrink-0">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (customConfirm.onCancel) customConfirm.onCancel();
-                      else setCustomConfirm(null);
-                    }}
+                    onClick={() => setCustomConfirm(null)}
                     className="flex-1 font-semibold text-xs text-blue-500 hover:bg-gray-50 active:bg-gray-100 transition-colors border-r border-gray-200/50"
                   >
                     {customConfirm.cancelText || 'Zrušit'}

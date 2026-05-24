@@ -1,44 +1,20 @@
-# Srdce pro Michaelku
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
 
-Soukroma mobile-first PWA aplikace pro spolecne vzpominky, vzkazy, mista, galerii, Google Workspace koutek a AI basnika.
+# Run and deploy your AI Studio app
 
-## Funkce
+This contains everything you need to run your app locally.
 
-- instalovatelna PWA s manifestem, ikonami, theme color a offline fallbackem
-- responzivni layout bez renderovani virtualniho telefonu
-- lokalni uloziste pro galerii, poznamky, mista, milniky a roli uzivatele
-- volitelne Google Workspace propojeni pro Docs, Gmail a Chat po prihlaseni
-- serverovy Gemini endpoint pro generovani romantickych textu
+View your app in AI Studio: https://ai.studio/apps/f1f9088b-959e-4557-97d3-9ffd1f4cc132
 
-## Lokani spusteni
+## Run Locally
 
-1. Nainstalujte zavislosti:
+**Prerequisites:**  Node.js
 
-   ```bash
-   npm install
-   ```
 
-2. Vytvorte `.env.local` podle `.env.example` a doplnte hodnoty:
-
-   ```bash
-   GEMINI_API_KEY="..."
-   GEMINI_MODEL="gemini-2.5-flash"
-   APP_URL="http://localhost:3000"
-   ```
-
-3. Spustte vyvojovy server:
-
-   ```bash
-   npm run dev
-   ```
-
-4. Otevrete `http://localhost:3000`.
-
-## Produkcni kontrola
-
-```bash
-npm run lint
-npm run build
-```
-
-Google Workspace funkce vyzaduji platnou Firebase/Google OAuth konfiguraci ve `firebase-applet-config.json` a povolene Google API scopes v Google Cloud/Firebase konzoli.
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
