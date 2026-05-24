@@ -429,8 +429,9 @@ export default function RomanceApp() {
   }
 
   const handleSendChatMessage = async (presetText?: string) => {
+    const spaceToSend = selectedSpace.trim();
     const messageToSend = presetText || customChatMessage;
-    if (!googleToken || !selectedSpace || !messageToSend.trim()) return;
+    if (!googleToken || !spaceToSend || !messageToSend.trim()) return;
 
     const signature = userRole === 'boyfriend' ? 'FáFa' : 'Beru';
     const textToSend = `💖 [Romance] Vzkaz od ${signature}: "${messageToSend.trim()}"`;
@@ -443,7 +444,7 @@ export default function RomanceApp() {
 
     setIsSendingChatMessage(true);
     try {
-      await sendChatMessage(googleToken, selectedSpace, textToSend);
+      await sendChatMessage(googleToken, spaceToSend, textToSend);
       if (!presetText) setCustomChatMessage('');
       setChatStatus("Vzkaz byl úspěšně doručen do vašeho Google Chatu!");
       setTimeout(() => setChatStatus(''), 4000);
@@ -2977,7 +2978,7 @@ export default function RomanceApp() {
           <button
             type="button"
             id="nav-more"
-            onClick={() => setActiveTab(Tab.MORE || Tab.WORKSPACE)}
+            onClick={() => setActiveTab(Tab.MORE)}
             className={`flex flex-col items-center gap-1 transition-all text-center flex-1 max-w-[65px] ${
               (activeTab === Tab.MORE || activeTab === Tab.WORKSPACE || activeTab === Tab.TIMELINE || activeTab === Tab.MESSAGE_BOARD) ? 'text-[#FF2D55] scale-105' : 'text-[#8E8E93] hover:text-gray-900'
             }`}

@@ -12,6 +12,11 @@ export async function POST(req: NextRequest) {
 
     const ai = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          "User-Agent": "myshell-romance-app",
+        },
+      },
     });
 
     const { category, customInput } = await req.json();
@@ -33,7 +38,7 @@ export async function POST(req: NextRequest) {
       prompt += ` Přidej tam osobní detail: "${customInput}".`;
     }
 
-    prompt += "\nOdpověď vrať čistě jako文本 (text), bez uvozovek na začátku a na konci, bez nadpisu, zformátované do pěkných odstavců nebo veršů.";
+    prompt += "\nOdpověď vrať čistě jako text, bez uvozovek na začátku a na konci, bez nadpisu, zformátované do pěkných odstavců nebo veršů.";
 
     const response = await ai.models.generateContent({
       model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
