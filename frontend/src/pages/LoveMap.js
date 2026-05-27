@@ -277,22 +277,14 @@ export default function LoveMap({ pair }) {
                   <div className="text-sm">
                     <div className="font-semibold">{p.title}</div>
                     {p.note && <div className="text-xs opacity-70">{p.note}</div>}
-                    <div className="mt-2 flex gap-2">
-                      <button
-                        onClick={() => showWeatherFor(p)}
-                        className="text-xs"
-                        style={{ color: '#3DA5FF' }}
-                      >
-                        Počasí
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        className="text-xs"
-                        style={{ color: '#C77A8A' }}
-                      >
-                        Smazat
-                      </button>
-                    </div>
+                    }
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      className="mt-2 text-xs"
+                      style={{ color: '#C77A8A' }}
+                    >
+                      Smazat
+                    </button>
                   </div>
                 </Popup>
               </Marker>

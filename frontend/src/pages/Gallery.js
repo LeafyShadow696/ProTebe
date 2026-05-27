@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Camera, X, Trash2, ImagePlus, Share2, Video as VideoIcon, SwitchCamera, Play } from 'lucide-react';
+import { Plus, Camera, X, Trash2, ImagePlus, Share2, SwitchCamera } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { api, storage } from '../lib/api';
@@ -12,7 +12,6 @@ const MAX_IMG_DIM = 1280;
 const JPEG_QUALITY = 0.82;
 const MAX_VIDEO_BYTES = 12 * 1024 * 1024; // 12 MB safe limit for base64 storage
 
-/** Compress an image File to JPEG dataURL. */
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -56,12 +55,10 @@ export default function Gallery({ pair }) {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
   const [viewer, setViewer] = useState(null);
-  const libraryRef = useRef(null);
-  const cameraBackRef = useRef(null);
-  const cameraFrontRef = useRef(null);
-  const videoRef = useRef(null);
+  const [showCameraSheet, setShowCameraSheet] = useState(false);
+  const fileRef = useRef(null);
+  const cameraFallbackRef = useRef(null);
 
   async function load() {
     if (!pair?.id) return;
@@ -97,17 +94,35 @@ export default function Gallery({ pair }) {
             sender_token: token,
             data_url: dataUrl,
             caption: '',
-            media_type: isVideo ? 'video' : 'image',
           });
           sent.push(data);
-        } catch (err) {
-          if (err?.message) setUploadError(err.message);
+        } catch {
+          /* skip broken file */
         }
       }
-      if (sent.length) {
-        setPhotos((prev) => [...sent.reverse(), ...prev]);
-        HAPTIC.success();
-      }
+      setPhotos((prev) => [...sent.reverse(), ...prev]);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleCapturedBlob(blob) {
+    if (!blob) return;
+    setShowCameraSheet(false);
+    setUploading(true);
+    try {
+      const token = storage.getToken();
+      const file = new File([blob], `foto-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const dataUrl = await compressImage(file);
+      const { data } = await api.post('/photos', {
+        pair_id: pair.id,
+        sender_token: token,
+        data_url: dataUrl,
+        caption: '',
+      });
+      setPhotos((prev) => [data, ...prev]);
+    } catch {
+      /* silent */
     } finally {
       setUploading(false);
     }
@@ -120,8 +135,13 @@ export default function Gallery({ pair }) {
     try {
       await api.delete(`/photos/${id}`);
     } catch {
-      /* server-side delete failed but UI already updated */
+      /* silent */
     }
+  }
+
+  function openCamera() {
+    // Try native camera sheet first; fallback to file input with capture
+    setShowCameraSheet(true);
   }
 
   return (
@@ -160,9 +180,9 @@ export default function Gallery({ pair }) {
             Zadní fotka
           </button>
           <button
-            onClick={() => cameraFrontRef.current?.click()}
-            data-testid="capture-front-btn"
-            className="flex items-center justify-center gap-2 rounded-2xl glass px-3 py-3 text-[13px] tap"
+            onClick={openCamera}
+            data-testid="upload-from-camera-btn"
+            className="flex-1 rounded-2xl glass px-4 py-3 text-sm tap"
             style={{ color: 'var(--ink)' }}
           >
             <SwitchCamera size={15} style={{ color: 'var(--rose)' }} />
@@ -188,27 +208,19 @@ export default function Gallery({ pair }) {
           </button>
         </div>
 
-        {/* Hidden inputs */}
+        {/* Hidden file inputs */}
         <input
           ref={libraryRef}
           type="file"
           accept="image/*,video/*"
           multiple
           className="hidden-file"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
           data-testid="file-input-library"
         />
+        {/* Fallback camera input for devices without getUserMedia */}
         <input
-          ref={cameraBackRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden-file"
-          onChange={(e) => handleFiles(e.target.files)}
-          data-testid="file-input-back"
-        />
-        <input
-          ref={cameraFrontRef}
+          ref={cameraFallbackRef}
           type="file"
           accept="image/*"
           capture="user"
@@ -222,14 +234,21 @@ export default function Gallery({ pair }) {
           accept="video/*"
           capture="environment"
           className="hidden-file"
-          onChange={(e) => handleFiles(e.target.files)}
-          data-testid="file-input-video"
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
+          data-testid="file-input-camera"
         />
 
         {uploading && (
-          <div className="mb-4 rounded-2xl glass px-4 py-3 text-sm" style={{ color: 'var(--ink-soft)' }}>
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mb-4 flex items-center gap-3 rounded-2xl glass px-4 py-3 text-sm"
+            style={{ color: 'var(--ink-soft)' }}
+          >
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
             Ukládám vzpomínku…
-          </div>
+          </motion.div>
         )}
         {uploadError && (
           <div
@@ -243,7 +262,7 @@ export default function Gallery({ pair }) {
         {loading && photos.length === 0 ? (
           <SkeletonGrid />
         ) : photos.length === 0 ? (
-          <EmptyState onPick={() => libraryRef.current?.click()} />
+          <EmptyState onPick={() => fileRef.current?.click()} onCamera={openCamera} />
         ) : (
           <MasonryGrid photos={photos} onOpen={setViewer} />
         )}
@@ -258,7 +277,208 @@ export default function Gallery({ pair }) {
           />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {showCameraSheet && (
+          <CameraSheet
+            onClose={() => setShowCameraSheet(false)}
+            onCapture={handleCapturedBlob}
+            onFallback={() => {
+              setShowCameraSheet(false);
+              setTimeout(() => cameraFallbackRef.current?.click(), 100);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function CameraSheet({ onClose, onCapture, onFallback }) {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [facingMode, setFacingMode] = useState('environment');
+  const [error, setError] = useState(null);
+
+  useSheetLock(true);
+
+  useEffect(() => {
+    startCamera(facingMode);
+    return () => stopCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facingMode]);
+
+  async function startCamera(mode) {
+    stopCamera();
+    setReady(false);
+    setError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('no-api');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: mode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        setReady(true);
+      }
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        setError('denied');
+      } else {
+        setError('unavailable');
+      }
+    }
+  }
+
+  function stopCamera() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setReady(false);
+  }
+
+  function capture() {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob(
+      (blob) => {
+        stopCamera();
+        onCapture(blob);
+      },
+      'image/jpeg',
+      0.9
+    );
+  }
+
+  function flip() {
+    setFacingMode((m) => (m === 'environment' ? 'user' : 'environment'));
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] flex flex-col"
+      style={{ background: '#000' }}
+      data-testid="camera-sheet"
+    >
+      {/* Header */}
+      <div
+        className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4 pt-safe"
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)' }}
+      >
+        <button
+          onClick={() => { stopCamera(); onClose(); }}
+          className="flex h-10 w-10 items-center justify-center rounded-full tap"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          aria-label="Zavrit"
+          data-testid="camera-close-btn"
+        >
+          <X size={20} style={{ color: '#fff' }} />
+        </button>
+        {ready && (
+          <button
+            onClick={flip}
+            className="flex h-10 w-10 items-center justify-center rounded-full tap"
+            style={{ background: 'rgba(0,0,0,0.5)' }}
+            aria-label="Prepnout kameru"
+            data-testid="camera-flip-btn"
+          >
+            <SwitchCamera size={20} style={{ color: '#fff' }} />
+          </button>
+        )}
+      </div>
+
+      {/* Video preview */}
+      {error ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
+          <Camera size={48} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
+            {error === 'denied'
+              ? 'Přístup k fotoaparátu byl zamítnut. Povol ho v nastavení prohlížeče.'
+              : error === 'no-api'
+              ? 'Tvůj prohlížeč nepodporuje přímý přístup k fotoaparátu.'
+              : 'Fotoaparát není k dispozici.'}
+          </p>
+          <button
+            onClick={onFallback}
+            className="rounded-2xl px-5 py-3 text-sm font-medium tap"
+            style={{ background: 'linear-gradient(180deg, #E5B3BB 0%, #C77A8A 100%)', color: '#1B0E14' }}
+            data-testid="camera-fallback-btn"
+          >
+            Vybrat ze souboru
+          </button>
+        </div>
+      ) : (
+        <video
+          ref={videoRef}
+          className="h-full w-full object-cover"
+          playsInline
+          muted
+          autoPlay
+          data-testid="camera-video"
+        />
+      )}
+
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* Capture button */}
+      {!error && (
+        <div
+          className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center pb-safe"
+          style={{
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 24px)',
+            paddingTop: 24,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
+          }}
+        >
+          <button
+            onClick={capture}
+            disabled={!ready}
+            data-testid="camera-capture-btn"
+            className="tap disabled:opacity-40"
+            aria-label="Vyfotit"
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              background: '#fff',
+              border: '4px solid rgba(255,255,255,0.4)',
+              boxShadow: '0 0 0 3px rgba(229,179,187,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 54,
+                height: 54,
+                borderRadius: '50%',
+                background: ready
+                  ? 'linear-gradient(180deg, #E5B3BB 0%, #C77A8A 100%)'
+                  : 'rgba(200,200,200,0.5)',
+              }}
+            />
+          </button>
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -323,10 +543,7 @@ function PhotoTile({ photo, onOpen }) {
         />
       )}
       {photo.caption && (
-        <div
-          className="px-2.5 py-1.5 text-[11px] leading-tight"
-          style={{ color: 'var(--ink-soft)' }}
-        >
+        <div className="px-2.5 py-1.5 text-[11px] leading-tight" style={{ color: 'var(--ink-soft)' }}>
           {photo.caption}
         </div>
       )}
@@ -341,17 +558,14 @@ function SkeletonGrid() {
         <div
           key={i}
           className="animate-pulse rounded-2xl"
-          style={{
-            background: 'rgba(255,255,255,0.04)',
-            height: 90 + ((i * 27) % 90),
-          }}
+          style={{ background: 'rgba(255,255,255,0.04)', height: 90 + ((i * 27) % 90) }}
         />
       ))}
     </div>
   );
 }
 
-function EmptyState({ onPick }) {
+function EmptyState({ onPick, onCamera }) {
   return (
     <GlassCard className="flex flex-col items-center px-6 py-10 text-center" testid="gallery-empty">
       <div
@@ -366,16 +580,23 @@ function EmptyState({ onPick }) {
       <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
         Sluneční odpoledne, ranní pohledy, zachycené úsměvy. Fotky i krátká videa se ukládají bezpečně mezi vámi dvěma.
       </p>
-      <button
-        onClick={onPick}
-        className="mt-5 rounded-2xl px-5 py-3 text-sm tap"
-        style={{
-          background: 'linear-gradient(180deg, #E5B3BB 0%, #C77A8A 100%)',
-          color: '#1B0E14',
-        }}
-      >
-        Přidat první vzpomínku
-      </button>
+      <div className="mt-5 flex gap-3">
+        <button
+          onClick={onCamera}
+          className="rounded-2xl px-5 py-3 text-sm tap"
+          style={{ background: 'linear-gradient(180deg, #E5B3BB 0%, #C77A8A 100%)', color: '#1B0E14' }}
+        >
+          <Camera size={14} className="mr-2 inline" />
+          Vyfotit
+        </button>
+        <button
+          onClick={onPick}
+          className="rounded-2xl glass px-5 py-3 text-sm tap"
+          style={{ color: 'var(--ink)' }}
+        >
+          Z knihovny
+        </button>
+      </div>
     </GlassCard>
   );
 }
@@ -397,7 +618,7 @@ function PhotoViewer({ photo, onClose, onDelete }) {
       const ext = isVideo ? 'mp4' : 'jpg';
       const file = new File([blob], `vzpominka.${ext}`, { type: blob.type || (isVideo ? 'video/mp4' : 'image/jpeg') });
       await shareOrCopy({
-        title: 'Pro Tebe 😍',
+        title: 'Pro Tebe',
         text: photo.caption || 'Naše vzpomínka',
         files: [file],
       });
@@ -413,14 +634,14 @@ function PhotoViewer({ photo, onClose, onDelete }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
       className="fixed inset-0 z-50 flex flex-col"
-      style={{ background: 'rgba(8,8,12,0.92)', backdropFilter: 'blur(20px)' }}
+      style={{ background: 'rgba(8,8,12,0.95)', backdropFilter: 'blur(20px)' }}
       data-testid="photo-viewer"
     >
       <div className="flex items-center justify-between p-3 pt-safe">
         <button
           onClick={onClose}
           className="flex h-10 w-10 items-center justify-center rounded-full glass tap"
-          aria-label="Zavřít"
+          aria-label="Zavrit"
           data-testid="viewer-close-btn"
         >
           <X size={18} style={{ color: 'var(--ink)' }} />
@@ -429,7 +650,7 @@ function PhotoViewer({ photo, onClose, onDelete }) {
           <button
             onClick={share}
             className="flex h-10 w-10 items-center justify-center rounded-full glass tap"
-            aria-label="Sdílet"
+            aria-label="Sdilet"
             data-testid="viewer-share-btn"
           >
             <Share2 size={18} style={{ color: 'var(--rose)' }} />
@@ -467,10 +688,7 @@ function PhotoViewer({ photo, onClose, onDelete }) {
         )}
       </motion.div>
       {photo.caption && (
-        <div
-          className="px-6 pb-safe pb-4 pt-2 text-center text-sm"
-          style={{ color: 'var(--ink-soft)' }}
-        >
+        <div className="px-6 pb-safe pb-4 pt-2 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>
           {photo.caption}
         </div>
       )}
