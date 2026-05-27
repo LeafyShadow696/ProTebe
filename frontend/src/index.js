@@ -10,7 +10,7 @@ root.render(<App />);
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
+      const _registration = await navigator.serviceWorker.register('/sw.js');
       
       // Listen for messages from SW (e.g. sync requests)
       navigator.serviceWorker.addEventListener('message', (event) => {

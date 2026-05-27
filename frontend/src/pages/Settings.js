@@ -67,7 +67,7 @@ export default function Settings({ pair, refreshPair }) {
     if (result === 'granted') {
       // Try to also subscribe to real push notifications
       try {
-        const sub = await subscribeToPush();
+        await subscribeToPush();
         setPushSubscribed(true);
         new Notification('Pro Tebe 😍', {
           body: 'Notifikace povoleny. Budete upozorňováni na nové zprávy.',

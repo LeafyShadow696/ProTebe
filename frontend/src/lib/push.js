@@ -3,7 +3,7 @@
  * Handles subscription + communication with backend
  */
 
-const VAPID_PUBLIC_KEY = null; // Will be fetched from backend if needed
+const _VAPID_PUBLIC_KEY = null; // Will be fetched from backend if needed
 
 export async function subscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -25,7 +25,7 @@ export async function subscribeToPush() {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         // applicationServerKey will be required in production
-        // applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        // applicationServerKey: _urlBase64ToUint8Array(_VAPID_PUBLIC_KEY)
       });
     } catch (err) {
       console.error('Failed to subscribe to push:', err);
@@ -79,7 +79,7 @@ export async function getPushSubscription() {
 }
 
 // Helper to convert VAPID key (not used yet but ready for production)
-function urlBase64ToUint8Array(base64String) {
+function _urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = window.atob(base64);
