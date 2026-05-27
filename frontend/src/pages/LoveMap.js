@@ -245,7 +245,11 @@ export default function LoveMap({ pair }) {
       <div className="px-4">
         <div
           className="relative overflow-hidden rounded-3xl"
-          style={{ height: 'calc(100vh - 320px)', minHeight: 380, border: '1px solid var(--border)' }}
+          style={{ 
+            height: 'min(65dvh, 520px)', 
+            minHeight: 320,
+            border: '1px solid var(--border)' 
+          }}
         >
           <MapContainer
             center={center}

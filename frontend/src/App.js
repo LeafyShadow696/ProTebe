@@ -15,11 +15,16 @@ import BottomTabBar from './components/BottomTabBar';
 import AmbientBackground from './components/AmbientBackground';
 
 const pageVariants = {
-  initial: { opacity: 0, y: 8, filter: 'blur(4px)' },
+  initial: { opacity: 0, y: 12, filter: 'blur(3px)' },
   animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
-  exit: { opacity: 0, y: -6, filter: 'blur(4px)' },
+  exit: { opacity: 0, y: -8, filter: 'blur(3px)' },
 };
-const pageTransition = { duration: 0.32, ease: [0.22, 1, 0.36, 1] };
+const pageTransition = { 
+  type: 'spring', 
+  stiffness: 260, 
+  damping: 28, 
+  mass: 0.9 
+};
 
 function AnimatedRoutes({ pair, refreshPair }) {
   const location = useLocation();
@@ -32,7 +37,7 @@ function AnimatedRoutes({ pair, refreshPair }) {
       animate="animate"
       exit="exit"
       transition={pageTransition}
-      className="min-h-screen w-full"
+      className="min-h-[100dvh] w-full pb-[calc(3.25rem+env(safe-area-inset-bottom))]"   // proper space for bottom tab bar + safe area on all devices
     >
       <Component pair={pair} refreshPair={refreshPair} />
     </motion.div>

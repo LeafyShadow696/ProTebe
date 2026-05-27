@@ -21,7 +21,7 @@ export default function BottomTabBar() {
       aria-label="Hlavní navigace"
     >
       <div
-        className="pointer-events-auto mx-3 mb-3 flex w-full max-w-[460px] items-stretch justify-between gap-1 rounded-[28px] px-2 py-2 glass-strong shadow-[0_10px_40px_rgba(0,0,0,0.45)]"
+        className="pointer-events-auto mx-2 mb-2 flex w-full max-w-[480px] items-stretch justify-between gap-0.5 rounded-3xl px-1.5 py-1.5 glass-strong shadow-[0_10px_40px_rgba(0,0,0,0.45)] sm:mx-3 sm:mb-3 sm:rounded-[28px] sm:px-2 sm:py-2"
         data-testid="bottom-tab-bar"
       >
         {tabs.map(({ to, label, Icon, testid }) => {

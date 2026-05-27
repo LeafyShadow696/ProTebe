@@ -44,6 +44,16 @@ body,
   color: var(--ink);
 }
 
+/* Mobile viewport height fixes for iOS Safari + Chrome */
+@supports (height: 100dvh) {
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+  .h-screen {
+    height: 100dvh;
+  }
+}
+
 /* Pleasant light mode background with soft gradient */
 [data-theme='light'] html,
 [data-theme='light'] body,
@@ -60,6 +70,8 @@ body {
   letter-spacing: -0.005em;
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
+  /* Better mobile scrolling */
+  -webkit-overflow-scrolling: touch;
 }
 
 * {
@@ -161,6 +173,15 @@ textarea {
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+}
+
+/* Reduce heavy effects on small mobile screens for better performance */
+@media (max-width: 480px) {
+  .ambient-bg::before,
+  .ambient-bg::after {
+    filter: blur(60px);
+    opacity: 0.45;
+  }
 }
 
 .ambient-bg::before,

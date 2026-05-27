@@ -222,7 +222,7 @@ export default function Messages({ pair }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-[100dvh] flex-col">
       <PageHeader
         kicker="Vzkazovník"
         title="Naše slova"
