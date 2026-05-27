@@ -311,14 +311,16 @@ async def photos_list(pair_id: str):
 
 @app.post("/api/photos")
 async def photos_create(body: PhotoIn):
-    if not body.data_url.startswith("data:image/"):
-        raise HTTPException(status_code=400, detail="Expected an image data URL")
+    if not (body.data_url.startswith("data:image/") or body.data_url.startswith("data:video/")):
+        raise HTTPException(status_code=400, detail="Expected an image or video data URL")
+    media_type = body.media_type or ("video" if body.data_url.startswith("data:video/") else "image")
     photo = {
         "id": gen_id(),
         "pair_id": body.pair_id,
         "sender_token": body.sender_token,
         "data_url": body.data_url,
         "caption": body.caption or "",
+        "media_type": media_type,
         "created_at": now_iso(),
     }
     await db.photos.insert_one(photo.copy())
@@ -425,10 +427,12 @@ async def ai_poem(body: AiPoemIn):
     system = (
         "Jsi citlivý český básník. Píšeš krátké, originální milostné básně v moderní češtině "
         "s dokonalou diakritikou. Vyhýbáš se klišé, kýči, generickým obratům a opakování. "
-        "Tvé básně jsou jemné, obrazné a osobní — působí jako šepot, ne jako pohlednice."
+        "Tvé básně jsou jemné, obrazné a osobní — působí jako šepot, ne jako pohlednice. "
+        "Důležité: pokud oslovuješ partnerku jménem, použij správný vokativ (např. Michaelka → Michaelko, "
+        "Anna → Anno). Skloňuj všechna jména přirozeně dle českých pádů."
     )
     prompt = (
-        f"Napiš krátkou milostnou báseň pro Michaelku.\n"
+        f"Napiš krátkou milostnou báseň pro partnerku jménem {body.partner_name} (1. pád).\n"
         f"Nálada: {mood}.\n"
         f"Délka: 4 až 8 veršů.\n"
         f"Formát: pouze báseň, bez nadpisu, bez uvozovek, bez komentáře.\n"

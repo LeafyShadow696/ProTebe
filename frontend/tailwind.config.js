@@ -4,13 +4,19 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-        sans: [
-          '-apple-system',
-          'BlinkMacSystemFont',
-          '"SF Pro Display"',
+        display: [
           '"Helvetica Neue"',
           'Helvetica',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Arial',
+          'sans-serif',
+        ],
+        sans: [
+          '"Helvetica Neue"',
+          'Helvetica',
+          '-apple-system',
+          'BlinkMacSystemFont',
           'Arial',
           'sans-serif',
         ],

@@ -35,11 +35,12 @@ body,
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: 'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-feature-settings: 'ss01', 'ss02', 'cv11';
+  font-feature-settings: 'kern', 'liga';
+  letter-spacing: -0.005em;
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -87,10 +88,38 @@ textarea {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Display font */
+/* Display headings — Helvetica Neue Light with subtle rose gradient */
 .font-display {
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-feature-settings: 'liga', 'kern';
+  font-family: 'Helvetica Neue', Helvetica, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  font-weight: 200;
+  letter-spacing: -0.025em;
+  background: linear-gradient(
+    180deg,
+    var(--ink) 0%,
+    var(--ink) 55%,
+    rgba(229, 179, 187, 0.85) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+[data-theme='light'] .font-display {
+  background: linear-gradient(
+    180deg,
+    var(--ink) 0%,
+    var(--ink) 55%,
+    rgba(199, 122, 138, 0.9) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.font-display em {
+  background: linear-gradient(180deg, #E5B3BB 0%, #C77A8A 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 /* Ambient living background */

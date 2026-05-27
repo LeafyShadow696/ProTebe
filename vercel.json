@@ -10,5 +10,15 @@
       "root": "backend",
       "routePrefix": "/_/backend"
     }
+  },
+  "build": {
+    "env": {
+      "REACT_APP_BACKEND_URL": "/_/backend",
+      "CI": "false",
+      "GENERATE_SOURCEMAP": "false"
+    }
+  },
+  "env": {
+    "DB_NAME": "pro_tebe"
   }
 }

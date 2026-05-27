@@ -1,16 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Camera, X, Trash2, ImagePlus, Share2 } from 'lucide-react';
+import { Plus, Camera, X, Trash2, ImagePlus, Share2, Video as VideoIcon, SwitchCamera, Play } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { api, storage } from '../lib/api';
 import { useSheetLock } from '../lib/hooks';
 import { shareOrCopy } from '../lib/media';
+import { HAPTIC } from '../lib/haptics';
 
-const MAX_DIM = 1280;
+const MAX_IMG_DIM = 1280;
 const JPEG_QUALITY = 0.82;
+const MAX_VIDEO_BYTES = 12 * 1024 * 1024; // 12 MB safe limit for base64 storage
 
-/** Compress an image File to JPEG dataURL, max 1280px on the longest side. */
+/** Compress an image File to JPEG dataURL. */
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -20,7 +22,7 @@ function compressImage(file) {
       img.onerror = () => reject(new Error('decode'));
       img.onload = () => {
         let { width, height } = img;
-        const scale = Math.min(1, MAX_DIM / Math.max(width, height));
+        const scale = Math.min(1, MAX_IMG_DIM / Math.max(width, height));
         width = Math.round(width * scale);
         height = Math.round(height * scale);
         const canvas = document.createElement('canvas');
@@ -36,15 +38,30 @@ function compressImage(file) {
   });
 }
 
+/** Read a video File as data URL, with a hard size cap. */
+function readVideo(file) {
+  return new Promise((resolve, reject) => {
+    if (file.size > MAX_VIDEO_BYTES) {
+      reject(new Error(`Video je příliš velké (${Math.round(file.size / 1024 / 1024)} MB). Maximum je 12 MB.`));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Gallery({ pair }) {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [viewer, setViewer] = useState(null); // selected photo
-  const [caption, setCaption] = useState('');
-  const [pendingFiles, setPendingFiles] = useState([]);
-  const fileRef = useRef(null);
-  const cameraRef = useRef(null);
+  const [uploadError, setUploadError] = useState('');
+  const [viewer, setViewer] = useState(null);
+  const libraryRef = useRef(null);
+  const cameraBackRef = useRef(null);
+  const cameraFrontRef = useRef(null);
+  const videoRef = useRef(null);
 
   async function load() {
     if (!pair?.id) return;
@@ -65,33 +82,39 @@ export default function Gallery({ pair }) {
   async function handleFiles(fileList) {
     const files = Array.from(fileList || []).slice(0, 8);
     if (files.length === 0) return;
+    setUploadError('');
     setUploading(true);
+    HAPTIC.light();
     try {
       const token = storage.getToken();
       const sent = [];
       for (const f of files) {
         try {
-          const dataUrl = await compressImage(f);
+          const isVideo = f.type.startsWith('video/');
+          const dataUrl = isVideo ? await readVideo(f) : await compressImage(f);
           const { data } = await api.post('/photos', {
             pair_id: pair.id,
             sender_token: token,
             data_url: dataUrl,
-            caption: caption.slice(0, 140),
+            caption: '',
+            media_type: isVideo ? 'video' : 'image',
           });
           sent.push(data);
-        } catch {
-          /* skip broken */
+        } catch (err) {
+          if (err?.message) setUploadError(err.message);
         }
       }
-      setPhotos((prev) => [...sent.reverse(), ...prev]);
-      setCaption('');
-      setPendingFiles([]);
+      if (sent.length) {
+        setPhotos((prev) => [...sent.reverse(), ...prev]);
+        HAPTIC.success();
+      }
     } finally {
       setUploading(false);
     }
   }
 
   async function handleDelete(id) {
+    HAPTIC.warning();
     setPhotos((prev) => prev.filter((p) => p.id !== id));
     setViewer(null);
     try {
@@ -113,10 +136,10 @@ export default function Gallery({ pair }) {
         }
         right={
           <button
-            onClick={() => fileRef.current?.click()}
+            onClick={() => libraryRef.current?.click()}
             data-testid="add-photo-btn"
             className="flex h-10 w-10 items-center justify-center rounded-full glass-strong tap"
-            aria-label="Přidat fotku"
+            aria-label="Přidat z knihovny"
           >
             <Plus size={18} style={{ color: 'var(--rose)' }} />
           </button>
@@ -125,44 +148,82 @@ export default function Gallery({ pair }) {
       />
 
       <div className="px-4">
-        <div className="mb-4 flex gap-2">
+        {/* Capture options — back camera, selfie, video, library */}
+        <div className="mb-4 grid grid-cols-2 gap-2">
           <button
-            onClick={() => fileRef.current?.click()}
-            data-testid="upload-from-files-btn"
-            className="flex-1 rounded-2xl glass px-4 py-3 text-sm tap"
+            onClick={() => cameraBackRef.current?.click()}
+            data-testid="capture-back-btn"
+            className="flex items-center justify-center gap-2 rounded-2xl glass px-3 py-3 text-[13px] tap"
             style={{ color: 'var(--ink)' }}
           >
-            <ImagePlus size={16} className="mr-2 inline" />
-            Z knihovny
+            <Camera size={15} style={{ color: 'var(--rose)' }} />
+            Zadní fotka
           </button>
           <button
-            onClick={() => cameraRef.current?.click()}
-            data-testid="upload-from-camera-btn"
-            className="flex-1 rounded-2xl glass px-4 py-3 text-sm tap"
+            onClick={() => cameraFrontRef.current?.click()}
+            data-testid="capture-front-btn"
+            className="flex items-center justify-center gap-2 rounded-2xl glass px-3 py-3 text-[13px] tap"
             style={{ color: 'var(--ink)' }}
           >
-            <Camera size={16} className="mr-2 inline" />
-            Vyfotit
+            <SwitchCamera size={15} style={{ color: 'var(--rose)' }} />
+            Selfie
+          </button>
+          <button
+            onClick={() => videoRef.current?.click()}
+            data-testid="capture-video-btn"
+            className="flex items-center justify-center gap-2 rounded-2xl glass px-3 py-3 text-[13px] tap"
+            style={{ color: 'var(--ink)' }}
+          >
+            <VideoIcon size={15} style={{ color: 'var(--rose)' }} />
+            Video
+          </button>
+          <button
+            onClick={() => libraryRef.current?.click()}
+            data-testid="upload-from-files-btn"
+            className="flex items-center justify-center gap-2 rounded-2xl glass px-3 py-3 text-[13px] tap"
+            style={{ color: 'var(--ink)' }}
+          >
+            <ImagePlus size={15} style={{ color: 'var(--rose)' }} />
+            Z knihovny
           </button>
         </div>
 
+        {/* Hidden inputs */}
         <input
-          ref={fileRef}
+          ref={libraryRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
           className="hidden-file"
           onChange={(e) => handleFiles(e.target.files)}
           data-testid="file-input-library"
         />
         <input
-          ref={cameraRef}
+          ref={cameraBackRef}
           type="file"
           accept="image/*"
           capture="environment"
           className="hidden-file"
           onChange={(e) => handleFiles(e.target.files)}
-          data-testid="file-input-camera"
+          data-testid="file-input-back"
+        />
+        <input
+          ref={cameraFrontRef}
+          type="file"
+          accept="image/*"
+          capture="user"
+          className="hidden-file"
+          onChange={(e) => handleFiles(e.target.files)}
+          data-testid="file-input-front"
+        />
+        <input
+          ref={videoRef}
+          type="file"
+          accept="video/*"
+          capture="environment"
+          className="hidden-file"
+          onChange={(e) => handleFiles(e.target.files)}
+          data-testid="file-input-video"
         />
 
         {uploading && (
@@ -170,11 +231,19 @@ export default function Gallery({ pair }) {
             Ukládám vzpomínku…
           </div>
         )}
+        {uploadError && (
+          <div
+            className="mb-4 rounded-2xl px-4 py-3 text-sm"
+            style={{ background: 'rgba(255,80,100,0.08)', color: '#F5A0AA' }}
+          >
+            {uploadError}
+          </div>
+        )}
 
         {loading && photos.length === 0 ? (
           <SkeletonGrid />
         ) : photos.length === 0 ? (
-          <EmptyState onPick={() => fileRef.current?.click()} />
+          <EmptyState onPick={() => libraryRef.current?.click()} />
         ) : (
           <MasonryGrid photos={photos} onOpen={setViewer} />
         )}
@@ -194,7 +263,6 @@ export default function Gallery({ pair }) {
 }
 
 function MasonryGrid({ photos, onOpen }) {
-  // Two-column masonry-ish layout using grid + variable heights.
   const left = [];
   const right = [];
   photos.forEach((p, i) => (i % 2 === 0 ? left : right).push(p));
@@ -216,6 +284,7 @@ function MasonryGrid({ photos, onOpen }) {
 }
 
 function PhotoTile({ photo, onOpen }) {
+  const isVideo = photo.media_type === 'video' || photo.data_url?.startsWith('data:video/');
   return (
     <motion.button
       layout
@@ -223,16 +292,36 @@ function PhotoTile({ photo, onOpen }) {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       onClick={() => onOpen(photo)}
-      className="block w-full overflow-hidden rounded-2xl tap"
+      className="relative block w-full overflow-hidden rounded-2xl tap"
       data-testid={`photo-tile-${photo.id}`}
     >
-      <img
-        src={photo.data_url}
-        alt={photo.caption || 'vzpomínka'}
-        loading="lazy"
-        decoding="async"
-        className="block h-auto w-full"
-      />
+      {isVideo ? (
+        <>
+          <video
+            src={photo.data_url}
+            preload="metadata"
+            muted
+            playsInline
+            className="block h-auto w-full"
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-full"
+              style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)' }}
+            >
+              <Play size={20} fill="currentColor" style={{ color: '#fff' }} />
+            </div>
+          </div>
+        </>
+      ) : (
+        <img
+          src={photo.data_url}
+          alt={photo.caption || 'vzpomínka'}
+          loading="lazy"
+          decoding="async"
+          className="block h-auto w-full"
+        />
+      )}
       {photo.caption && (
         <div
           className="px-2.5 py-1.5 text-[11px] leading-tight"
@@ -275,7 +364,7 @@ function EmptyState({ onPick }) {
         Tady budou vaše chvíle
       </h3>
       <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
-        Sluneční odpoledne, ranní pohledy, zachycené úsměvy. Fotky se ukládají bezpečně mezi vámi dvěma.
+        Sluneční odpoledne, ranní pohledy, zachycené úsměvy. Fotky i krátká videa se ukládají bezpečně mezi vámi dvěma.
       </p>
       <button
         onClick={onPick}
@@ -293,6 +382,8 @@ function EmptyState({ onPick }) {
 
 function PhotoViewer({ photo, onClose, onDelete }) {
   useSheetLock(true);
+  const isVideo = photo.media_type === 'video' || photo.data_url?.startsWith('data:video/');
+
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -300,11 +391,11 @@ function PhotoViewer({ photo, onClose, onDelete }) {
   }, [onClose]);
 
   async function share() {
-    // Convert data URL to File for Web Share API.
     try {
       const res = await fetch(photo.data_url);
       const blob = await res.blob();
-      const file = new File([blob], 'vzpominka.jpg', { type: blob.type || 'image/jpeg' });
+      const ext = isVideo ? 'mp4' : 'jpg';
+      const file = new File([blob], `vzpominka.${ext}`, { type: blob.type || (isVideo ? 'video/mp4' : 'image/jpeg') });
       await shareOrCopy({
         title: 'Pro Tebe 😍',
         text: photo.caption || 'Naše vzpomínka',
@@ -359,11 +450,21 @@ function PhotoViewer({ photo, onClose, onDelete }) {
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         className="flex flex-1 items-center justify-center px-4"
       >
-        <img
-          src={photo.data_url}
-          alt={photo.caption || 'vzpomínka'}
-          className="max-h-full max-w-full rounded-2xl object-contain"
-        />
+        {isVideo ? (
+          <video
+            src={photo.data_url}
+            controls
+            playsInline
+            autoPlay
+            className="max-h-full max-w-full rounded-2xl"
+          />
+        ) : (
+          <img
+            src={photo.data_url}
+            alt={photo.caption || 'vzpomínka'}
+            className="max-h-full max-w-full rounded-2xl object-contain"
+          />
+        )}
       </motion.div>
       {photo.caption && (
         <div
