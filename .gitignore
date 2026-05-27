@@ -60,3 +60,9 @@ backend/tests/__pycache__/
 .emergent/
 _old_nextjs/
 memory/
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
