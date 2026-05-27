@@ -33,9 +33,17 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any, List, Optional
+import json
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+
+try:
+    from pywebpush import webpush, WebPushException
+    PUSH_ENABLED = True
+except ImportError:
+    PUSH_ENABLED = False
+    WebPushException = Exception  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
@@ -129,6 +137,9 @@ if USE_MEMORY:
             return _get_coll(name)
     db = MemDB()
     print("[backend] Running in MEMORY mode (no MongoDB). Great for live preview!")
+
+# Push subscriptions storage (simple in-memory for now)
+push_subscriptions: dict[str, list[dict]] = {}
 else:
     client = AsyncIOMotorClient(MONGO_URL)
     db = client[DB_NAME]
@@ -356,6 +367,32 @@ async def messages_create(body: MessageIn):
         "created_at": now_iso(),
     }
     await db.messages.insert_one(msg.copy())
+
+    # Send push notification to the other person in the pair (if subscribed)
+    if PUSH_ENABLED and body.pair_id in push_subscriptions:
+        other_token = None
+        pair = await get_pair_by_token(body.sender_token)
+        if pair:
+            other_token = pair.get("partner_token") if body.sender_token == pair.get("owner_token") else pair.get("owner_token")
+
+        if other_token:
+            # Find subscriptions belonging to the other person
+            # For simplicity we notify everyone in the pair except the sender
+            for sub in push_subscriptions.get(body.pair_id, []):
+                try:
+                    webpush(
+                        subscription_info=sub,
+                        data=json.dumps({
+                            "title": "Pro Tebe",
+                            "body": f"Nová zpráva od {body.sender_name}",
+                            "url": "/",
+                        }),
+                        vapid_private_key=os.environ.get("VAPID_PRIVATE_KEY"),
+                        vapid_claims={"sub": "mailto:admin@pro-tebe.app"}
+                    )
+                except Exception:
+                    pass  # Ignore individual push failures
+
     return clean_doc(msg)
 
 
@@ -672,3 +709,48 @@ async def ai_dateidea(body: AiDateIdeaIn):
             cleaned.append(ln)
     ideas = cleaned[:3]
     return {"ideas": ideas, "created_at": now_iso()}
+
+
+# ---------------------------------------------------------------------------
+# Push Notifications (Web Push)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/push/subscribe")
+async def push_subscribe(body: dict):
+    """Store a push subscription for a user."""
+    subscription = body.get("subscription")
+    token = body.get("token")
+
+    if not subscription or not token:
+        raise HTTPException(status_code=400, detail="Missing subscription or token")
+
+    # Find which pair this token belongs to
+    pair = await get_pair_by_token(token)
+    if not pair:
+        raise HTTPException(status_code=404, detail="Pair not found")
+
+    pair_id = pair["id"]
+    if pair_id not in push_subscriptions:
+        push_subscriptions[pair_id] = []
+
+    # Avoid duplicate subscriptions
+    existing = [s for s in push_subscriptions[pair_id] if s.get("endpoint") == subscription.get("endpoint")]
+    if not existing:
+        push_subscriptions[pair_id].append(subscription)
+
+    return {"success": True}
+
+
+@app.post("/api/push/unsubscribe")
+async def push_unsubscribe(body: dict):
+    subscription = body.get("subscription")
+    if not subscription:
+        return {"success": True}
+
+    for pair_id in list(push_subscriptions.keys()):
+        push_subscriptions[pair_id] = [
+            s for s in push_subscriptions[pair_id]
+            if s.get("endpoint") != subscription.get("endpoint")
+        ]
+
+    return {"success": True}

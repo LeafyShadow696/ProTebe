@@ -8,3 +8,4 @@ python-dotenv==1.0.1
 # emergentintegrations  # proprietary, optional for AI features (falls back if missing)
 python-multipart==0.0.12
 pillow==11.0.0
+pywebpush==1.14.1  # optional, for real push notifications

@@ -6,6 +6,7 @@ import Avatar from '../components/Avatar';
 import { api, storage } from '../lib/api';
 import { compressImageFile } from '../lib/media';
 import { getBatteryInfo } from '../lib/haptics';
+import { subscribeToPush, unsubscribeFromPush, getPushSubscription } from '../lib/push';
 import { toAccusativeCz } from '../lib/czech';
 
 export default function Settings({ pair, refreshPair }) {
@@ -13,6 +14,7 @@ export default function Settings({ pair, refreshPair }) {
   const [notifyState, setNotifyState] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
+  const [pushSubscribed, setPushSubscribed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -25,6 +27,11 @@ export default function Settings({ pair, refreshPair }) {
 
   useEffect(() => {
     getBatteryInfo().then(setBattery);
+    
+    // Check if already subscribed to push
+    getPushSubscription().then((sub) => {
+      setPushSubscribed(!!sub);
+    });
   }, []);
 
   const role = storage.getRole();
@@ -53,17 +60,40 @@ export default function Settings({ pair, refreshPair }) {
 
   async function requestNotifications() {
     if (typeof Notification === 'undefined') return;
-    if (Notification.permission === 'granted') {
-      new Notification('Pro Tebe 😍', { body: 'Notifikace už jsou povolené ♡', icon: '/icon-192.svg' });
-      return;
-    }
+
     const result = await Notification.requestPermission();
     setNotifyState(result);
+
     if (result === 'granted') {
-      new Notification('Pro Tebe 😍', {
-        body: 'Budu tě jemně upozorňovat na výročí a nové vzkazy.',
-        icon: '/icon-192.svg',
-      });
+      // Try to also subscribe to real push notifications
+      try {
+        const sub = await subscribeToPush();
+        setPushSubscribed(true);
+        new Notification('Pro Tebe 😍', {
+          body: 'Notifikace povoleny. Budete upozorňováni na nové zprávy.',
+          icon: '/icon-192.svg',
+        });
+      } catch (e) {
+        // Fallback to simple local notification
+        new Notification('Pro Tebe 😍', {
+          body: 'Notifikace povoleny (push zatím nepodporován v tomto prohlížeči).',
+          icon: '/icon-192.svg',
+        });
+      }
+    }
+  }
+
+  async function togglePush() {
+    if (pushSubscribed) {
+      await unsubscribeFromPush();
+      setPushSubscribed(false);
+    } else {
+      try {
+        await subscribeToPush();
+        setPushSubscribed(true);
+      } catch (e) {
+        alert('Push notifikace se nepodařilo zapnout: ' + e.message);
+      }
     }
   }
 
@@ -347,6 +377,36 @@ export default function Settings({ pair, refreshPair }) {
               </button>
             )}
           </div>
+
+          {/* Real Push Notifications toggle */}
+          {notifyState === 'granted' && (
+            <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+                    Push notifikace
+                  </div>
+                  <div className="text-xs" style={{ color: 'var(--ink-soft)' }}>
+                    {pushSubscribed 
+                      ? 'Dostáváte upozornění i mimo aplikaci.' 
+                      : 'Zapněte pro upozornění na nové zprávy.'}
+                  </div>
+                </div>
+                <button
+                  onClick={togglePush}
+                  className="rounded-xl px-4 py-1.5 text-xs font-medium tap"
+                  style={{
+                    background: pushSubscribed 
+                      ? 'rgba(229,179,187,0.2)' 
+                      : 'rgba(229,179,187,0.9)',
+                    color: pushSubscribed ? 'var(--rose)' : '#1B0E14'
+                  }}
+                >
+                  {pushSubscribed ? 'Vypnout' : 'Zapnout'}
+                </button>
+              </div>
+            </div>
+          )}
         </GlassCard>
 
         {/* Battery status (native Battery API) */}

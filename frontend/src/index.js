@@ -6,11 +6,23 @@ import App from './App';
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
 
-// Register service worker for PWA offline support.
+// Register service worker for PWA offline support + push + background sync
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      /* ignored — works fine without SW */
-    });
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      
+      // Listen for messages from SW (e.g. sync requests)
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'SYNC_MESSAGES') {
+          // Let the app know it should retry sending queued messages
+          window.dispatchEvent(new CustomEvent('sw-sync-messages'));
+        }
+      });
+      
+      console.log('Service Worker registered successfully');
+    } catch (error) {
+      console.log('Service Worker registration failed (offline support disabled)');
+    }
   });
 }

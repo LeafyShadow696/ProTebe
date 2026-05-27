@@ -1,0 +1,91 @@
+/**
+ * Push Notification utilities for Pro Tebe PWA
+ * Handles subscription + communication with backend
+ */
+
+const VAPID_PUBLIC_KEY = null; // Will be fetched from backend if needed
+
+export async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    throw new Error('Push notifications are not supported in this browser');
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+
+  // Check existing subscription
+  let subscription = await registration.pushManager.getSubscription();
+
+  if (!subscription) {
+    // We need VAPID public key from backend for real push.
+    // For now we create a subscription (it will work with a real key later).
+    // Many browsers allow creating a subscription even without applicationServerKey in some cases,
+    // but for production you MUST provide it.
+
+    try {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        // applicationServerKey will be required in production
+        // applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    } catch (err) {
+      console.error('Failed to subscribe to push:', err);
+      throw err;
+    }
+  }
+
+  // Send subscription to backend
+  try {
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: subscription.toJSON(),
+        // We can send the current pair token so backend knows who to notify
+        token: localStorage.getItem('remix.token'),
+      }),
+    });
+  } catch (err) {
+    console.warn('Could not send subscription to backend (will retry later)');
+  }
+
+  return subscription;
+}
+
+export async function unsubscribeFromPush() {
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+
+  if (subscription) {
+    try {
+      await fetch('/api/push/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription: subscription.toJSON(),
+        }),
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    await subscription.unsubscribe();
+  }
+}
+
+export async function getPushSubscription() {
+  if (!('serviceWorker' in navigator)) return null;
+  const registration = await navigator.serviceWorker.ready;
+  return registration.pushManager.getSubscription();
+}
+
+// Helper to convert VAPID key (not used yet but ready for production)
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
