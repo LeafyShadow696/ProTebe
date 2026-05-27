@@ -48,7 +48,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 MONGO_URL = os.environ.get("MONGO_URL", "memory://local")
 DB_NAME = os.environ.get("DB_NAME", "pro_tebe")
-EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY") or os.environ.get("EMERGENT_API_KEY", "")
 
 USE_MEMORY = MONGO_URL.startswith("memory") or not MONGO_URL
 
