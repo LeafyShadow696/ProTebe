@@ -444,6 +444,29 @@ async def photos_create(body: PhotoIn):
         "created_at": now_iso(),
     }
     await db.photos.insert_one(photo.copy())
+
+    # Send push notification to the other person in the pair (if subscribed)
+    if PUSH_ENABLED and body.pair_id in push_subscriptions:
+        pair = await get_pair_by_token(body.sender_token)
+        if pair:
+            other_token = pair.get("partner_token") if body.sender_token == pair.get("owner_token") else pair.get("owner_token")
+            sender_name = pair.get("owner_name") if body.sender_token == pair.get("owner_token") else pair.get("partner_name") or "Někdo"
+
+            for sub in push_subscriptions.get(body.pair_id, []):
+                try:
+                    webpush(
+                        subscription_info=sub,
+                        data=json.dumps({
+                            "title": "Pro Tebe",
+                            "body": f"Nová vzpomínka od {sender_name}",
+                            "url": "/gallery",
+                        }),
+                        vapid_private_key=os.environ.get("VAPID_PRIVATE_KEY"),
+                        vapid_claims={"sub": "mailto:admin@pro-tebe.app"}
+                    )
+                except Exception:
+                    pass  # Ignore individual push failures
+
     return clean_doc(photo)
 
 

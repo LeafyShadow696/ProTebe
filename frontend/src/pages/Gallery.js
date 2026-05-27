@@ -12,6 +12,30 @@ const MAX_IMG_DIM = 1280;
 const JPEG_QUALITY = 0.82;
 const MAX_VIDEO_BYTES = 12 * 1024 * 1024; // 12 MB safe limit for base64 storage
 
+const GALLERY_CACHE_KEY = (pairId) => `gallery:${pairId}`;
+
+function loadCachedPhotos(pairId) {
+  try {
+    const raw = localStorage.getItem(GALLERY_CACHE_KEY(pairId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed.photos) ? parsed.photos : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCachedPhotos(pairId, photos) {
+  try {
+    localStorage.setItem(GALLERY_CACHE_KEY(pairId), JSON.stringify({
+      photos: photos.slice(0, 100), // limit to keep storage reasonable
+      savedAt: Date.now(),
+    }));
+  } catch {
+    /* ignore quota */
+  }
+}
+
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -65,12 +89,26 @@ export default function Gallery({ pair }) {
 
   async function load() {
     if (!pair?.id) return;
-    setLoading(true);
+
+    // Instant load from cache for great perceived speed + offline support
+    const cached = loadCachedPhotos(pair.id);
+    if (cached.length > 0) {
+      setPhotos(cached);
+      setLoading(false); // hide skeleton immediately if we have cache
+    } else {
+      setLoading(true);
+    }
+
     try {
       const { data } = await api.get(`/photos/${pair.id}`);
       setPhotos(data);
+      saveCachedPhotos(pair.id, data);
+    } catch {
+      // Network failed — keep showing cached version (offline mode)
+      if (cached.length === 0) setLoading(false);
     } finally {
-      setLoading(false);
+      // only turn off loading if we didn't have cache
+      if (cached.length === 0) setLoading(false);
     }
   }
 
@@ -103,7 +141,9 @@ export default function Gallery({ pair }) {
           /* skip broken file */
         }
       }
-      setPhotos((prev) => [...sent.reverse(), ...prev]);
+      const newList = [...sent.reverse(), ...photos];
+      setPhotos(newList);
+      saveCachedPhotos(pair.id, newList);
     } finally {
       setUploading(false);
     }
@@ -123,7 +163,9 @@ export default function Gallery({ pair }) {
         data_url: dataUrl,
         caption: '',
       });
-      setPhotos((prev) => [data, ...prev]);
+      const newList = [data, ...photos];
+      setPhotos(newList);
+      saveCachedPhotos(pair.id, newList);
     } catch {
       /* silent */
     } finally {
@@ -133,8 +175,10 @@ export default function Gallery({ pair }) {
 
   async function handleDelete(id) {
     HAPTIC.warning();
-    setPhotos((prev) => prev.filter((p) => p.id !== id));
+    const newList = photos.filter((p) => p.id !== id);
+    setPhotos(newList);
     setViewer(null);
+    saveCachedPhotos(pair.id, newList);
     try {
       await api.delete(`/photos/${id}`);
     } catch {
@@ -508,11 +552,11 @@ const PhotoTile = React.memo(function PhotoTile({ photo, onOpen }) {
   const isVideo = photo.media_type === 'video' || photo.data_url?.startsWith('data:video/');
   return (
     <motion.button
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.985 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
       onClick={() => onOpen(photo)}
-      className="relative block w-full overflow-hidden rounded-2xl tap"
+      className="relative block w-full overflow-hidden rounded-2xl tap active:scale-[0.985]"
       data-testid={`photo-tile-${photo.id}`}
     >
       {isVideo ? (
@@ -552,22 +596,22 @@ const PhotoTile = React.memo(function PhotoTile({ photo, onOpen }) {
 });
 
 function MasonryGrid({ photos, onOpen }) {
-  const left = [];
-  const right = [];
-  photos.forEach((p, i) => (i % 2 === 0 ? left : right).push(p));
+  // Simple responsive masonry: 2 columns on mobile, 3 on larger screens
+  const cols = [ [], [], [] ];
+  photos.forEach((p, i) => {
+    const colIndex = i % 3;
+    cols[colIndex].push(p);
+  });
 
   return (
-    <div className="grid grid-cols-2 gap-3" data-testid="gallery-grid">
-      <div className="space-y-3">
-        {left.map((p) => (
-          <PhotoTile key={p.id} photo={p} onOpen={onOpen} />
-        ))}
-      </div>
-      <div className="space-y-3 pt-6">
-        {right.map((p) => (
-          <PhotoTile key={p.id} photo={p} onOpen={onOpen} />
-        ))}
-      </div>
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3" data-testid="gallery-grid">
+      {cols.map((col, idx) => (
+        <div key={idx} className={`space-y-3 ${idx === 2 ? 'hidden md:block' : ''} ${idx === 1 ? 'pt-4 md:pt-0' : ''}`}>
+          {col.map((p) => (
+            <PhotoTile key={p.id} photo={p} onOpen={onOpen} />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
