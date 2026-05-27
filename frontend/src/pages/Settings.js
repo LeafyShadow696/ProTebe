@@ -22,6 +22,8 @@ export default function Settings({ pair, refreshPair }) {
   const [uploadingMine, setUploadingMine] = useState(false);
   const [uploadingHers, setUploadingHers] = useState(false);
   const [battery, setBattery] = useState(null);
+  const [serverPushConfigured, setServerPushConfigured] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
   const mineFileRef = useRef(null);
   const hersFileRef = useRef(null);
 
@@ -32,6 +34,12 @@ export default function Settings({ pair, refreshPair }) {
     getPushSubscription().then((sub) => {
       setPushSubscribed(!!sub);
     });
+
+    // Check if backend has VAPID keys configured
+    fetch('/api/push/public-key')
+      .then(r => r.json())
+      .then(data => setServerPushConfigured(!!data?.configured))
+      .catch(() => {});
   }, []);
 
   const role = storage.getRole();
@@ -94,6 +102,25 @@ export default function Settings({ pair, refreshPair }) {
       } catch (e) {
         alert('Push notifikace se nepodařilo zapnout: ' + e.message);
       }
+    }
+  }
+
+  async function sendTestPush() {
+    const token = storage.getToken();
+    if (!token) return;
+
+    setTestingPush(true);
+    try {
+      const res = await api.post('/push/test', { token });
+      if (res.data?.success) {
+        alert(`Testovací push odeslán! (${res.data.sent} z ${res.data.total_subscriptions})`);
+      } else {
+        alert(res.data?.message || 'Žádné odběry push notifikací zatím nejsou.');
+      }
+    } catch (e) {
+      alert('Test push se nepodařilo odeslat: ' + (e.response?.data?.detail || e.message));
+    } finally {
+      setTestingPush(false);
     }
   }
 
@@ -385,6 +412,11 @@ export default function Settings({ pair, refreshPair }) {
                 <div>
                   <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
                     Push notifikace
+                    {serverPushConfigured ? (
+                      <span className="ml-1 text-[10px] text-emerald-400">● server OK</span>
+                    ) : (
+                      <span className="ml-1 text-[10px] text-amber-400">● server bez klíčů</span>
+                    )}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--ink-soft)' }}>
                     {pushSubscribed 
@@ -405,6 +437,17 @@ export default function Settings({ pair, refreshPair }) {
                   {pushSubscribed ? 'Vypnout' : 'Zapnout'}
                 </button>
               </div>
+
+              {pushSubscribed && serverPushConfigured && (
+                <button
+                  onClick={sendTestPush}
+                  disabled={testingPush}
+                  className="mt-3 w-full rounded-xl py-2 text-xs font-medium tap disabled:opacity-60"
+                  style={{ background: 'rgba(229,179,187,0.12)', color: 'var(--ink)' }}
+                >
+                  {testingPush ? 'Odesílám test...' : 'Odeslat testovací push notifikaci'}
+                </button>
+              )}
             </div>
           )}
         </GlassCard>

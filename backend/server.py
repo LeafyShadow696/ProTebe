@@ -773,3 +773,47 @@ async def push_public_key():
     if not pub:
         return {"publicKey": None, "configured": False}
     return {"publicKey": pub, "configured": True}
+
+
+@app.post("/api/push/test")
+async def push_test(body: dict):
+    """Send a test push notification (useful for verifying that real push works)."""
+    token = body.get("token")
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing token")
+
+    pair = await get_pair_by_token(token)
+    if not pair:
+        raise HTTPException(status_code=404, detail="Pair not found")
+
+    pair_id = pair["id"]
+    subs = push_subscriptions.get(pair_id, [])
+
+    if not subs:
+        return {"success": False, "message": "No push subscriptions found for this pair yet."}
+
+    sent = 0
+    errors = 0
+    for sub in subs:
+        try:
+            if PUSH_ENABLED and os.environ.get("VAPID_PRIVATE_KEY"):
+                webpush(
+                    subscription_info=sub,
+                    data=json.dumps({
+                        "title": "Pro Tebe 🎉",
+                        "body": "Push notifikace fungují správně!",
+                        "url": "/",
+                    }),
+                    vapid_private_key=os.environ.get("VAPID_PRIVATE_KEY"),
+                    vapid_claims={"sub": "mailto:admin@pro-tebe.app"}
+                )
+            sent += 1
+        except Exception:
+            errors += 1
+
+    return {
+        "success": sent > 0,
+        "sent": sent,
+        "failed": errors,
+        "total_subscriptions": len(subs)
+    }
