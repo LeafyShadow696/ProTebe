@@ -105,6 +105,8 @@ export default function LoveDashboard({ pair }) {
     try {
       const { data } = await api.post('/ai/quote', {
         partner_name: pair?.partner_name || 'Michaelka',
+        time_of_day: currentTimeOfDayCz(),
+        mood: mood.key,
       });
       const text = (data?.quote || '').trim();
       if (text) {
@@ -208,7 +210,10 @@ export default function LoveDashboard({ pair }) {
         <LoveCounterCard duration={duration} />
 
         {/* AI Quote of the day */}
-        <GlassCard className="overflow-hidden p-6" testid="quote-card">
+        <GlassCard 
+          className={`overflow-hidden p-6 transition-all duration-700 ${mood.key === 'evening' || mood.key === 'night' ? 'border-rose-900/30' : ''}`}
+          testid="quote-card"
+        >
           <div className="mb-3 flex items-center justify-between">
             <span
               className="text-[10px] uppercase tracking-[0.22em]"
@@ -249,7 +254,10 @@ export default function LoveDashboard({ pair }) {
         </GlassCard>
 
         {/* AI Date Tips — "Co spolu dnes?" */}
-        <GlassCard className="overflow-hidden p-5" testid="tips-card">
+        <GlassCard 
+          className={`overflow-hidden p-5 transition-all duration-700 ${mood.key === 'morning' ? 'border-amber-900/20' : ''}`}
+          testid="tips-card"
+        >
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Lightbulb size={14} style={{ color: 'var(--rose)' }} />

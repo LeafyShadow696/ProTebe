@@ -233,7 +233,8 @@ class AiPoemIn(BaseModel):
 
 class AiQuoteIn(BaseModel):
     partner_name: str = "Michaelka"
-    mood: Optional[str] = None
+    time_of_day: Optional[str] = None   # ráno | dopoledne | odpoledne | večer | noc
+    mood: Optional[str] = None          # morning | day | evening | night
 
 
 class AiMessageIn(BaseModel):
@@ -562,10 +563,29 @@ async def ai_poem(body: AiPoemIn):
 async def ai_quote(body: AiQuoteIn):
     system = (
         "Jsi tichý český lyrik. Tvoříš velmi krátké, jednovětné nebo dvouvětné milostné citáty "
-        "v moderní češtině s dokonalou diakritikou. Bez klišé, bez opakování, bez uvozovek."
+        "v moderní češtině s dokonalou diakritikou. Bez klišé, bez opakování, bez uvozovek. "
+        "Citát by měl jemně odrážet náladu dané denní doby."
     )
+
+    time_tone = {
+        "ráno": "něžný, svěží, plný tichého očekávání",
+        "dopoledne": "světlý, jasný, plný klidné energie",
+        "odpoledne": "teplý, zralý, mírně zlatavý",
+        "večer": "zlatý, intimní, pomalý",
+        "noc": "temný, něžný, hluboký, jako šeptání",
+    }.get(body.time_of_day or "", "něžný a milostný")
+
+    mood_text = {
+        "morning": "svěží ranní světlo",
+        "day": "teplé denní světlo",
+        "evening": "zlatavé večerní světlo",
+        "night": "měsíční světlo a ticho",
+    }.get(body.mood or "", "")
+
     prompt = (
         f"Vytvoř jednu krátkou (max. 18 slov) milostnou myšlenku pro {body.partner_name}. "
+        f"Tón by měl být {time_tone}. "
+        f"{('Atmosféra: ' + mood_text + '. ') if mood_text else ''}"
         "Bez nadpisu, bez podpisu, bez uvozovek. Pouze samotný citát na jednom řádku."
     )
     try:
@@ -608,8 +628,9 @@ async def ai_dateidea(body: AiDateIdeaIn):
     """Generate 3 short creative 'co spolu dnes' date ideas in Czech."""
     system = (
         "Jsi kreativní český průvodce pro páry. Navrhuješ konkrétní, originální a hřejivé "
-        "nápady, co dělat spolu — nikdy klišé jako 'kino + restaurace'. Mysli na atmosféru, "
-        "smysly, hru, sdílené zážitky. Píšeš česky s dokonalou diakritikou."
+        "nápady, co dělat spolu — nikdy klišé jako 'kino + restaurace'. "
+        "Nápady by měly jemně odrážet náladu dané denní doby (ráno je svěží a něžné, večer intimní a zlatavé, noc tiché a hluboké). "
+        "Mysli na atmosféru, smysly, hru, sdílené zážitky. Píšeš česky s dokonalou diakritikou."
     )
     vibe_map = {
         "cozy": "domácí, klidné, do tepla",
