@@ -196,6 +196,7 @@ class AiDateIdeaIn(BaseModel):
     time_of_day: Optional[str] = None  # ráno | dopoledne | odpoledne | večer | noc
     weather: Optional[str] = None  # free-text like "slunečno, 22°C"
     vibe: Optional[str] = "any"  # cozy | active | romantic | playful | any
+    force: bool = False  # request fresh, different ideas
 
 
 class MessageIn(BaseModel):
@@ -246,6 +247,7 @@ class AiQuoteIn(BaseModel):
     partner_name: str = "Michaelka"
     time_of_day: Optional[str] = None   # ráno | dopoledne | odpoledne | večer | noc
     mood: Optional[str] = None          # morning | day | evening | night
+    force: bool = False                 # request a fresh, different quote
 
 
 class AiMessageIn(BaseModel):
@@ -619,11 +621,14 @@ async def ai_quote(body: AiQuoteIn):
         "night": "měsíční světlo a ticho",
     }.get(body.mood or "", "")
 
+    forceHint = " Vytvoř něco úplně nového a svěžího, co jsi ještě nenapsal." if body.force else ""
+
     prompt = (
         f"Vytvoř jednu krátkou (max. 18 slov) milostnou myšlenku pro {body.partner_name}. "
         f"Tón by měl být {time_tone}. "
         f"{('Atmosféra: ' + mood_text + '. ') if mood_text else ''}"
         "Bez nadpisu, bez podpisu, bez uvozovek. Pouze samotný citát na jednom řádku."
+        f"{forceHint}"
     )
     try:
         text = await _ai_chat(system, prompt, session=f"quote-{gen_id()[:8]}")
@@ -686,11 +691,14 @@ async def ai_dateidea(body: AiDateIdeaIn):
     bits.append(f"nálada: {vibe_map.get(body.vibe or 'any', vibe_map['any'])}")
     context = "; ".join(bits)
 
+    forceHint = "\nVytvoř úplně nové a originální nápady, které jsi ještě nenavrhl." if getattr(body, 'force', False) else ""
+
     prompt = (
         f"Navrhni 3 krátké nápady, co může dnes podniknout pár (já a {body.partner_name}).\n"
         f"Kontext: {context}.\n"
         "Každý nápad max. 14 slov, jedna věta. Bez číslování, bez odrážek, bez uvozovek.\n"
         "Vrať přesně 3 řádky, na každém jeden nápad."
+        f"{forceHint}"
     )
     try:
         text = await _ai_chat(system, prompt, session=f"date-{gen_id()[:8]}")

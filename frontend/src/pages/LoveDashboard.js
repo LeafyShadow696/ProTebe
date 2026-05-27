@@ -101,12 +101,19 @@ export default function LoveDashboard({ pair }) {
   async function fetchQuote(force = false) {
     if (quoteLoading) return;
     if (!force && quote) return;
+
+    if (force) {
+      // Clear daily cache so we definitely get something new
+      localStorage.removeItem(QUOTE_CACHE_KEY);
+    }
+
     setQuoteLoading(true);
     try {
       const { data } = await api.post('/ai/quote', {
         partner_name: pair?.partner_name || 'Michaelka',
         time_of_day: currentTimeOfDayCz(),
         mood: mood.key,
+        force: force, // hint for backend to be more creative
       });
       const text = (data?.quote || '').trim();
       if (text) {
@@ -123,6 +130,11 @@ export default function LoveDashboard({ pair }) {
   async function fetchTips(force = false) {
     if (tipsLoading) return;
     if (!force && tips.length > 0) return;
+
+    if (force) {
+      localStorage.removeItem(TIPS_CACHE_KEY);
+    }
+
     setTipsLoading(true);
     try {
       const { data } = await api.post('/ai/dateidea', {
@@ -130,6 +142,7 @@ export default function LoveDashboard({ pair }) {
         season: currentSeasonCz(),
         time_of_day: currentTimeOfDayCz(),
         vibe: 'romantic',
+        force: force,
       });
       const ideas = Array.isArray(data?.ideas) ? data.ideas : [];
       if (ideas.length > 0) {
