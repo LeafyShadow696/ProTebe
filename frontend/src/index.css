@@ -222,6 +222,20 @@ input[type='file'].hidden-file {
   pointer-events: none;
 }
 
+/* Bottom tab bar — hidden while a sheet/modal is open */
+.bottom-tab-bar-wrap {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+body.sheet-open .bottom-tab-bar-wrap {
+  opacity: 0;
+  transform: translateY(30px);
+}
+/* Disable pointer events on the bar AND all its descendants while a sheet is open. */
+body.sheet-open .bottom-tab-bar-wrap,
+body.sheet-open .bottom-tab-bar-wrap * {
+  pointer-events: none !important;
+}
+
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce) {
   .ambient-bg::before,

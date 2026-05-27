@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import { api, storage } from '../lib/api';
 import { toAccusativeCz } from '../lib/czech';
 import { formatCzechDate } from '../lib/dates';
+import { useSheetLock } from '../lib/hooks';
 
 const REACTIONS = ['❤️', '😊', '🥺', '🔥', '🌹'];
 const POLL_INTERVAL = 4000;
@@ -55,6 +56,9 @@ export default function Messages({ pair }) {
   const listRef = useRef(null);
   const meToken = storage.getToken();
   const role = storage.getRole();
+
+  // Hide bottom tab bar whenever any inline sheet/popover is open.
+  useSheetLock(showSuggest || pickerFor !== null);
 
   // Realtime polling — simple but reliable.
   useEffect(() => {
@@ -552,6 +556,7 @@ function LockedBubble({ mine, msg }) {
 
 function CapsuleSheet({ current, onClose, onPick }) {
   const [customDate, setCustomDate] = useState(current || addDaysIso(30));
+  useSheetLock(true);
   return (
     <motion.div
       initial={{ opacity: 0 }}

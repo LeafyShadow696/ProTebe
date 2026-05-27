@@ -17,7 +17,7 @@ export default function BottomTabBar() {
   const location = useLocation();
   return (
     <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pb-safe"
+      className="bottom-tab-bar-wrap pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center pb-safe"
       aria-label="Hlavní navigace"
     >
       <div

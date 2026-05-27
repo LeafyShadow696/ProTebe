@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { api } from '../lib/api';
 import { formatCzechDate, shortRelativeCzech } from '../lib/dates';
+import { useSheetLock } from '../lib/hooks';
 
 const CZ_DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 const CZ_MONTHS_FULL = [
@@ -335,6 +336,7 @@ function AddEventSheet({ pair, initialDate, onClose, onCreated }) {
   const [note, setNote] = useState('');
   const [type, setType] = useState('event');
   const [saving, setSaving] = useState(false);
+  useSheetLock(true);
 
   async function save() {
     if (!title.trim() || saving) return;

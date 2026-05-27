@@ -23,7 +23,21 @@ Production-ready Progressive Web App (PWA) s názvem „Remix: Srdce pro Michael
 - Photos: base64 data URL přímo v Mongo (vhodné pro osobní škálu).
 - PWA: standalone display, viewport-fit=cover, safe-area handling, ikony 192/512.
 
-## Implemented Features (Jan 27, 2026)
+## Implemented Features (Iteration 2 — Jan 27, 2026 evening)
+- **Rebrand**: app renamed from "Remix" to **"Pro Tebe 😍"** (title, manifest, PWA shortcut, all UI copy).
+- **Default names**: owner pre-fills as **František**, partner as **Michaelka**.
+- **Časová kapsle (Time Capsule)** v Messages — odešli zprávu do budoucna, otevře se až ve zvolený den:
+  - Lock button vedle send tlačítka
+  - Bottom sheet s 5 presety (týden / měsíc / 3 měsíce / půl roku / rok) + vlastní datum picker
+  - Indikátor "Časová kapsle — otevře se [datum]" nad input boxem
+  - Locked bubble pro odesilatele: „Tvoje kapsle · Čeká pro ni · Otevře se DD. měsíc YYYY · za N dní"
+  - Locked bubble pro příjemce: „Kapsle od tebe · Tajemství · Otevře se …"
+  - Auto-unlock: re-render každou minutu, takže kapsle se sama „otevře" v daný den
+  - Po otevření malý indikátor „kapsle otevřena DD. měsíc YYYY"
+- **Backend**: `MessageIn` přijímá nový optional `unlock_date` (YYYY-MM-DD). Plně zpětně kompatibilní.
+- **Bug fix**: BottomTabBar se elegantně skryje (fade + slide down) když je otevřený jakýkoli bottom sheet — vyřešen click-intercept problém přes globální `body.sheet-open` CSS pravidlo a `useSheetLock` hook.
+
+## Implemented Features (Iteration 1 — Jan 27, 2026)
 1. **Onboarding** — Create new pair / Join via pair-code, ambient hero, Cormorant Garamond „Srdce pro Michaelku".
 2. **Love Dashboard** — live counter dní/hodin/minut/sekund od 3. 4. 2026, AI denní citát (auto-cached na den), mood widget dle denní doby, vzpomínek widget.
 3. **Galerie vzpomínek** — upload z knihovny / kamery s automatickou kompresí na 1280px / JPEG 0.82, masonry grid 2-column, lazy-load, fullscreen viewer se swipe-out (klávesa Esc).

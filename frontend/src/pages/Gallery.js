@@ -4,6 +4,7 @@ import { Plus, Camera, X, Trash2, ImagePlus } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { api, storage } from '../lib/api';
+import { useSheetLock } from '../lib/hooks';
 
 const MAX_DIM = 1280;
 const JPEG_QUALITY = 0.82;
@@ -290,6 +291,7 @@ function EmptyState({ onPick }) {
 }
 
 function PhotoViewer({ photo, onClose, onDelete }) {
+  useSheetLock(true);
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);

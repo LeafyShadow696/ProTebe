@@ -6,6 +6,7 @@ import { Plus, MapPin, X, Trash2, Locate } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { api } from '../lib/api';
+import { useSheetLock } from '../lib/hooks';
 
 // Custom marker — rose-accent pin without external image dep.
 const heartIcon = L.divIcon({
@@ -43,6 +44,8 @@ export default function LoveMap({ pair }) {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [mapRef, setMapRef] = useState(null);
+
+  useSheetLock(showForm);
 
   async function load() {
     if (!pair?.id) return;
