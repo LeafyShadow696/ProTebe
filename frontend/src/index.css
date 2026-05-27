@@ -3,13 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --bg: #09090B;
-  --bg-soft: #18181B;
-  --ink: #FAFAFA;
-  --ink-soft: #A19D9E;
-  --rose: #E5B3BB;
-  --rose-deep: #3A1C28;
-  --border: rgba(255, 255, 255, 0.08);
+  --bg: #0A0A0C;
+  --bg-soft: #151518;
+  --ink: #F8F8FA;
+  --ink-soft: #9C9899;
+  --rose: #E8B9C1;
+  --rose-deep: #2F1A23;
+  --border: rgba(255, 255, 255, 0.07);
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.09);
   color-scheme: dark light;
 }
 
@@ -78,6 +80,21 @@ textarea {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Premium iOS-like glassmorphism */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
 }
 
 /* Safe areas */

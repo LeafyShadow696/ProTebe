@@ -10,7 +10,10 @@ import { HAPTIC, requestWakeLock, releaseWakeLock } from '../lib/haptics';
 
 const MAX_IMG_DIM = 1280;
 const JPEG_QUALITY = 0.82;
-const MAX_VIDEO_BYTES = 12 * 1024 * 1024; // 12 MB safe limit for base64 storage
+const MAX_VIDEO_BYTES = 10 * 1024 * 1024; // lowered to 10MB after compression
+
+const TARGET_VIDEO_WIDTH = 720;
+const TARGET_VIDEO_BITRATE = 1_200_000; // 1.2 Mbps for good quality/size balance
 
 const GALLERY_CACHE_KEY = (pairId) => `gallery:${pairId}`;
 
@@ -61,36 +64,83 @@ function compressImage(file) {
   });
 }
 
-/** Read a video File as data URL, with size + duration checks for better UX. */
-function readVideo(file) {
-  return new Promise((resolve, reject) => {
-    if (file.size > MAX_VIDEO_BYTES) {
-      reject(new Error(`Video je příliš velké (${Math.round(file.size / 1024 / 1024)} MB). Maximum je 12 MB.`));
+/**
+ * Real client-side video compression using canvas + MediaRecorder.
+ * This actually re-encodes the video at lower resolution and bitrate.
+ */
+async function compressVideo(file) {
+  if (file.size > MAX_VIDEO_BYTES * 2) {
+    throw new Error(`Video je příliš velké (${Math.round(file.size / 1024 / 1024)} MB).`);
+  }
+
+  const video = document.createElement('video');
+  video.src = URL.createObjectURL(file);
+  video.muted = true;
+
+  await new Promise((res, rej) => {
+    video.onloadedmetadata = res;
+    video.onerror = () => rej(new Error('Nelze načíst video pro kompresi.'));
+  });
+
+  const duration = video.duration;
+  if (duration > 180) {
+    URL.revokeObjectURL(video.src);
+    throw new Error('Video je delší než 3 minuty. Nahrajte kratší klip.');
+  }
+
+  // Calculate target dimensions (maintain aspect ratio, max width)
+  let { videoWidth: w, videoHeight: h } = video;
+  const scale = Math.min(1, TARGET_VIDEO_WIDTH / w);
+  const targetW = Math.round(w * scale);
+  const targetH = Math.round(h * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  // Use MediaRecorder for real re-encoding
+  const stream = canvas.captureStream(30); // 30fps
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ? 'video/webm;codecs=vp9'
+    : 'video/webm';
+
+  const recorder = new MediaRecorder(stream, {
+    mimeType,
+    videoBitsPerSecond: TARGET_VIDEO_BITRATE,
+  });
+
+  const chunks = [];
+  recorder.ondataavailable = (e) => chunks.push(e.data);
+  const done = new Promise((resolve) => {
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+  });
+
+  recorder.start();
+
+  // Play and draw frames
+  video.currentTime = 0;
+  await video.play();
+
+  const drawFrame = () => {
+    if (video.paused || video.ended) {
+      recorder.stop();
       return;
     }
+    ctx.drawImage(video, 0, 0, targetW, targetH);
+    requestAnimationFrame(drawFrame);
+  };
+  drawFrame();
 
-    const video = document.createElement('video');
-    video.preload = 'metadata';
+  const compressedBlob = await done;
+  URL.revokeObjectURL(video.src);
 
-    video.onloadedmetadata = () => {
-      const duration = video.duration;
-      URL.revokeObjectURL(video.src);
-
-      // Warn for very long videos (better than hard block)
-      if (duration > 180) {
-        reject(new Error('Video je delší než 3 minuty. Zkuste kratší klip pro lepší zážitek.'));
-        return;
-      }
-
-      // Proceed with reading
-      const reader = new FileReader();
-      reader.onerror = () => reject(reader.error);
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(file);
-    };
-
-    video.onerror = () => reject(new Error('Nelze načíst video.'));
-    video.src = URL.createObjectURL(file);
+  // Convert back to data URL
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(compressedBlob);
   });
 }
 
@@ -148,7 +198,7 @@ export default function Gallery({ pair }) {
       for (const f of files) {
         try {
           const isVideo = f.type.startsWith('video/');
-          const dataUrl = isVideo ? await readVideo(f) : await compressImage(f);
+          const dataUrl = isVideo ? await compressVideo(f) : await compressImage(f);
           const { data } = await api.post('/photos', {
             pair_id: pair.id,
             sender_token: token,
