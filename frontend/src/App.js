@@ -59,7 +59,6 @@ export default function App() {
   const [theme, setTheme] = useState(storage.getTheme());
   const [bootChecked, setBootChecked] = useState(false);
 
-  // Theme handling
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     storage.setTheme(theme);
@@ -80,7 +79,6 @@ export default function App() {
     []
   );
 
-  // Hydrate from server on mount.
   useEffect(() => {
     (async () => {
       await refreshPair();
@@ -90,36 +88,39 @@ export default function App() {
 
   if (!bootChecked) {
     return (
-      <div className="relative min-h-screen w-full">
-        <AmbientBackground />
-        <div className="grain" />
-        <div className="relative z-10 flex min-h-screen items-center justify-center text-white/40">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6 }}
-            className="font-display text-3xl tracking-wide"
-          >
-            Remix
-          </motion.div>
+      <BrowserRouter>
+        <div className="relative min-h-screen w-full">
+          <AmbientBackground />
+          <div className="grain" />
+          <div className="relative z-10 flex min-h-screen items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6 }}
+              className="font-display text-3xl tracking-wide"
+              style={{ color: 'var(--ink-soft)' }}
+            >
+              Pro Tebe
+            </motion.div>
+          </div>
         </div>
-      </div>
+      </BrowserRouter>
     );
   }
 
   if (!pair) {
     return (
-      <div className="relative min-h-screen w-full overflow-hidden">
-        <AmbientBackground />
-        <div className="grain" />
-        <Onboarding
-          onReady={(p) => {
-            setPair(p);
-          }}
-          theme={theme}
-          setTheme={setTheme}
-        />
-      </div>
+      <BrowserRouter>
+        <div className="relative min-h-screen w-full overflow-hidden">
+          <AmbientBackground />
+          <div className="grain" />
+          <Onboarding
+            onReady={(p) => setPair(p)}
+            theme={theme}
+            setTheme={setTheme}
+          />
+        </div>
+      </BrowserRouter>
     );
   }
 

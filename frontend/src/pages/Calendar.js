@@ -39,7 +39,8 @@ function ymd(year, month, day) {
 }
 
 export default function Calendar({ pair }) {
-  const today = new Date();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const today = useMemo(() => new Date(), []);
   const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [events, setEvents] = useState([]);
   const [showAdd, setShowAdd] = useState(false);

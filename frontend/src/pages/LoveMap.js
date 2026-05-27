@@ -4,7 +4,6 @@ import L from 'leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, MapPin, X, Trash2, Locate, Cloud, Share2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
-import GlassCard from '../components/GlassCard';
 import { api } from '../lib/api';
 import { useSheetLock } from '../lib/hooks';
 import { fetchWeather, getCurrentPosition } from '../lib/weather';
@@ -208,6 +207,7 @@ export default function LoveMap({ pair }) {
                   <div className="text-sm">
                     <div className="font-semibold">{p.title}</div>
                     {p.note && <div className="text-xs opacity-70">{p.note}</div>}
+                    }
                     <button
                       onClick={() => handleDelete(p.id)}
                       className="mt-2 text-xs"
