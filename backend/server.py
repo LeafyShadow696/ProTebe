@@ -46,12 +46,92 @@ from pydantic import BaseModel, Field
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ["DB_NAME"]
+MONGO_URL = os.environ.get("MONGO_URL", "memory://local")
+DB_NAME = os.environ.get("DB_NAME", "pro_tebe")
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
-client = AsyncIOMotorClient(MONGO_URL)
-db = client[DB_NAME]
+USE_MEMORY = MONGO_URL.startswith("memory") or not MONGO_URL
+
+if USE_MEMORY:
+    # Lightweight in-memory store for local dev & live preview (no Mongo needed)
+    _mem: dict[str, dict] = {"pairs": {}, "messages": {}, "photos": {}, "events": {}, "places": {}, "poems": {}}
+
+    def _match(doc: dict, q: dict) -> bool:
+        if not q:
+            return True
+        for k, v in q.items():
+            if k == "$or":
+                if not any(_match(doc, subq) for subq in v):
+                    return False
+                continue
+            if doc.get(k) != v:
+                return False
+        return True
+
+    def _get_coll(name: str):
+        store = _mem[name]
+
+        async def insert_one(doc: dict):
+            _id = doc.get("id")
+            store[_id] = dict(doc)  # copy
+            return type("Ins", (), {"inserted_id": _id})()
+
+        async def find_one(q: dict):
+            for d in store.values():
+                if _match(d, q):
+                    return dict(d)
+            return None
+
+        def find(q: dict):
+            class Cursor:
+                def __init__(self):
+                    self._sort = None
+                def sort(self, key, direction=1):
+                    self._sort = (key, direction)
+                    return self
+                async def to_list(self, limit: int = 1000):
+                    res = [dict(d) for d in store.values() if _match(d, q)]
+                    if self._sort:
+                        sk, sd = self._sort
+                        res.sort(key=lambda x: x.get(sk) or "", reverse=(sd < 0))
+                    return res[:limit]
+            return Cursor()
+
+        async def update_one(q: dict, up: dict):
+            for _id, d in list(store.items()):
+                if _match(d, q):
+                    if "$set" in up:
+                        d.update(up["$set"])
+                    return type("Upd", (), {"matched_count": 1})()
+            return type("Upd", (), {"matched_count": 0})()
+
+        async def delete_one(q: dict):
+            for _id, d in list(store.items()):
+                if _match(d, q):
+                    del store[_id]
+                    return type("Del", (), {"deleted_count": 1})()
+            return type("Del", (), {"deleted_count": 0})()
+
+        return type("Coll", (), {
+            "insert_one": staticmethod(insert_one),
+            "find_one": staticmethod(find_one),
+            "find": staticmethod(find),
+            "update_one": staticmethod(update_one),
+            "delete_one": staticmethod(delete_one),
+        })()
+
+    class MemDB:
+        def __getitem__(self, name: str):
+            return _get_coll(name)
+        def __getattr__(self, name: str):
+            if name.startswith("_"):
+                raise AttributeError(name)
+            return _get_coll(name)
+    db = MemDB()
+    print("[backend] Running in MEMORY mode (no MongoDB). Great for live preview!")
+else:
+    client = AsyncIOMotorClient(MONGO_URL)
+    db = client[DB_NAME]
 
 app = FastAPI(title="Pro Tebe 😍")
 
@@ -313,7 +393,7 @@ async def photos_list(pair_id: str):
 async def photos_create(body: PhotoIn):
     if not (body.data_url.startswith("data:image/") or body.data_url.startswith("data:video/")):
         raise HTTPException(status_code=400, detail="Expected an image or video data URL")
-    media_type = body.media_type or ("video" if body.data_url.startswith("data:video/") else "image")
+    media_type = "video" if body.data_url.startswith("data:video/") else "image"
     photo = {
         "id": gen_id(),
         "pair_id": body.pair_id,
@@ -406,19 +486,43 @@ MOOD_DESCRIPTIONS_CZ = {
 
 
 async def _ai_chat(system: str, prompt: str, *, session: str) -> str:
-    """Helper that calls Emergent LLM (Claude Sonnet) and returns plain text."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    """Helper that calls Emergent LLM (Claude Sonnet) and returns plain text.
+    Falls back to beautiful Czech samples when no key / package / network.
+    """
+    if not EMERGENT_LLM_KEY:
+        # Fallback mode for live preview / no key
+        return _fallback_ai_text(prompt)
 
-    chat = (
-        LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=session,
-            system_message=system,
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+
+        chat = (
+            LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id=session,
+                system_message=system,
+            )
+            .with_model("anthropic", "claude-sonnet-4-6")
         )
-        .with_model("anthropic", "claude-sonnet-4-6")
-    )
-    response = await chat.send_message(UserMessage(text=prompt))
-    return (response or "").strip()
+        response = await chat.send_message(UserMessage(text=prompt))
+        return (response or "").strip()
+    except Exception:
+        return _fallback_ai_text(prompt)
+
+
+def _fallback_ai_text(prompt: str) -> str:
+    """Curated warm Czech fallbacks so the app feels alive in preview without external deps."""
+    p = (prompt or "").lower()
+    if "báseň" in p or "poem" in p:
+        return "Tvé dlaně voní po dešti,\nslunce se usmívá v nich.\nV každém tichém večeru\njsi můj domov, můj klid."
+    if "citát" in p or "quote" in p or "myšlen" in p:
+        return "V tobě našel jsem ticho, které zpívá."
+    if "nápad" in p or "co spolu" in p or "date" in p:
+        return "Projděme se bosí rosou a počítejme hvězdy.\nUvařme si čaj a poslouchejme déšť na střeše.\nSedněme na balkoně a vymýšlejme příběhy o lidech, které míjíme."
+    if "zpráv" in p or "message" in p:
+        return "Myslím na tebe v každém tichém okamžiku."
+    # generic loving
+    return "Jsi můj nejmilejší domov."
 
 
 @app.post("/api/ai/poem")

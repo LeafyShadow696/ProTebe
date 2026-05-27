@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Camera, X, Trash2, ImagePlus, Share2, SwitchCamera } from 'lucide-react';
+import { Plus, Camera, X, Trash2, ImagePlus, Share2, SwitchCamera, Video, Play } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { api, storage } from '../lib/api';
@@ -57,8 +57,11 @@ export default function Gallery({ pair }) {
   const [uploading, setUploading] = useState(false);
   const [viewer, setViewer] = useState(null);
   const [showCameraSheet, setShowCameraSheet] = useState(false);
-  const fileRef = useRef(null);
+  const [uploadError, setUploadError] = useState('');
   const cameraFallbackRef = useRef(null);
+  const libraryRef = useRef(null);
+  const cameraBackRef = useRef(null);
+  const videoInputRef = useRef(null);
 
   async function load() {
     if (!pair?.id) return;
@@ -189,12 +192,12 @@ export default function Gallery({ pair }) {
             Selfie
           </button>
           <button
-            onClick={() => videoRef.current?.click()}
+            onClick={() => videoInputRef.current?.click()}
             data-testid="capture-video-btn"
             className="flex items-center justify-center gap-2 rounded-2xl glass px-3 py-3 text-[13px] tap"
             style={{ color: 'var(--ink)' }}
           >
-            <VideoIcon size={15} style={{ color: 'var(--rose)' }} />
+            <Video size={15} style={{ color: 'var(--rose)' }} />
             Video
           </button>
           <button
@@ -218,6 +221,16 @@ export default function Gallery({ pair }) {
           onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
           data-testid="file-input-library"
         />
+        {/* Back camera photo */}
+        <input
+          ref={cameraBackRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden-file"
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
+          data-testid="file-input-back"
+        />
         {/* Fallback camera input for devices without getUserMedia */}
         <input
           ref={cameraFallbackRef}
@@ -225,17 +238,16 @@ export default function Gallery({ pair }) {
           accept="image/*"
           capture="user"
           className="hidden-file"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
           data-testid="file-input-front"
         />
         <input
-          ref={videoRef}
+          ref={videoInputRef}
           type="file"
           accept="video/*"
-          capture="environment"
           className="hidden-file"
           onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
-          data-testid="file-input-camera"
+          data-testid="file-input-video"
         />
 
         {uploading && (
@@ -262,7 +274,7 @@ export default function Gallery({ pair }) {
         {loading && photos.length === 0 ? (
           <SkeletonGrid />
         ) : photos.length === 0 ? (
-          <EmptyState onPick={() => fileRef.current?.click()} onCamera={openCamera} />
+          <EmptyState onPick={() => libraryRef.current?.click()} onCamera={openCamera} />
         ) : (
           <MasonryGrid photos={photos} onOpen={setViewer} />
         )}

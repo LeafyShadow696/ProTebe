@@ -4,6 +4,6 @@ motor==3.6.0
 pymongo==4.9.1
 pydantic==2.9.2
 python-dotenv==1.0.1
-emergentintegrations
+# emergentintegrations  # proprietary, optional for AI features (falls back if missing)
 python-multipart==0.0.12
 pillow==11.0.0
