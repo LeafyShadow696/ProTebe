@@ -23,6 +23,16 @@ Production-ready Progressive Web App (PWA) s názvem „Remix: Srdce pro Michael
 - Photos: base64 data URL přímo v Mongo (vhodné pro osobní škálu).
 - PWA: standalone display, viewport-fit=cover, safe-area handling, ikony 192/512.
 
+## Implemented Features (Iteration 3 — Jan 27, 2026 late evening)
+- **Profilové fotky** — avatar upload pro tebe i partnerku v Nastavení (komprese 512px / JPEG 0.85). Zobrazují se jako CoupleAvatars na Dashboardu.
+- **Editace jména** — pencil icon u tvého jména v Nastavení, inline edit s Enter / blur save.
+- **AI Tipy „Co spolu dnes?"** — nový widget na Dashboardu s 3 originálními nápady aktivit. Kontextové dle ročního období + denní doby. Cache 1 den v localStorage. Sdílení každého tipu přes Web Share.
+- **Počasí na mapě** — Open-Meteo integrace (zdarma, bez klíče). Tlačítko „Počasí" u každého místa zobrazí teplotu, emoji, popis a rychlost větru. Reálná data.
+- **„Tady jsem" GPS** — tlačítko v headeru mapy získá aktuální GPS polohu, vycentruje mapu a otevře dialog pro pojmenování místa.
+- **Export do nativního kalendáře** — `.ics` download na každé události (otevře se přímo v Apple Calendar / Google Calendar / Outlook). Včetně 1-day-before reminder.
+- **Sdílení přes Web Share API** všude — poesie, tipy, místa (s OSM odkazem), události (s datem a poznámkou), fotky (s File API). Spadnou na clipboard pokud Web Share nedostupný.
+- **Backend nové endpointy**: `PATCH /api/pair/{token}` (update name + photos), `POST /api/ai/dateidea` (3 nápady v češtině s diakritikou).
+
 ## Implemented Features (Iteration 2 — Jan 27, 2026 evening)
 - **Rebrand**: app renamed from "Remix" to **"Pro Tebe 😍"** (title, manifest, PWA shortcut, all UI copy).
 - **Default names**: owner pre-fills as **František**, partner as **Michaelka**.
