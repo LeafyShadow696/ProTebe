@@ -4,7 +4,7 @@ import { Heart, Sparkles, RefreshCw, Sun, Moon, CloudMoon, Sunrise, Lightbulb, S
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { CoupleAvatars } from '../components/Avatar';
-import { api, storage } from '../lib/api';
+import { api } from '../lib/api';
 import { formatCzechDate, loveDuration, timeOfDayMood } from '../lib/dates';
 import { toAccusativeCz } from '../lib/czech';
 import { shareOrCopy } from '../lib/media';
@@ -79,6 +79,7 @@ export default function LoveDashboard({ pair }) {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [tips, setTips] = useState(loadCachedTips() || []);
   const [tipsLoading, setTipsLoading] = useState(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const mood = useMemo(() => timeOfDayMood(), [tick]);
   const MoodIcon = MOOD_ICON[mood.key] || Sun;
   const fetched = useRef(false);
