@@ -9,7 +9,6 @@ import { timeOfDayMood } from '../lib/dates';
 export default function AmbientBackground() {
   const mood = useMemo(() => timeOfDayMood().key, []);
   const moodClass = `mood-${mood}`;
-  const moodClass = `mood-${mood}`;
 
   return (
     <>
