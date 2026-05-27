@@ -6,7 +6,7 @@ import GlassCard from '../components/GlassCard';
 import { api, storage } from '../lib/api';
 import { useSheetLock } from '../lib/hooks';
 import { shareOrCopy } from '../lib/media';
-import { HAPTIC } from '../lib/haptics';
+import { HAPTIC, requestWakeLock, releaseWakeLock } from '../lib/haptics';
 
 const MAX_IMG_DIM = 1280;
 const JPEG_QUALITY = 0.82;
@@ -322,6 +322,16 @@ function CameraSheet({ onClose, onCapture, onFallback }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facingMode]);
 
+  // Keep screen awake while camera is active
+  useEffect(() => {
+    if (ready) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+    return () => releaseWakeLock();
+  }, [ready]);
+
   async function startCamera(mode) {
     stopCamera();
     setReady(false);
@@ -619,9 +629,13 @@ function PhotoViewer({ photo, onClose, onDelete }) {
   const isVideo = photo.media_type === 'video' || photo.data_url?.startsWith('data:video/');
 
   useEffect(() => {
+    requestWakeLock(); // keep screen on while viewing memories
     const onKey = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      releaseWakeLock();
+    };
   }, [onClose]);
 
   async function share() {

@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Copy, Sun, Moon, Bell, BellOff, LogOut, Heart, Shield, Sparkles, Check, Camera, Pencil } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import Avatar from '../components/Avatar';
 import { api, storage } from '../lib/api';
 import { compressImageFile } from '../lib/media';
+import { getBatteryInfo } from '../lib/haptics';
 import { toAccusativeCz } from '../lib/czech';
 
 export default function Settings({ pair, refreshPair }) {
@@ -18,8 +19,13 @@ export default function Settings({ pair, refreshPair }) {
   const [savingName, setSavingName] = useState(false);
   const [uploadingMine, setUploadingMine] = useState(false);
   const [uploadingHers, setUploadingHers] = useState(false);
+  const [battery, setBattery] = useState(null);
   const mineFileRef = useRef(null);
   const hersFileRef = useRef(null);
+
+  useEffect(() => {
+    getBatteryInfo().then(setBattery);
+  }, []);
 
   const role = storage.getRole();
   const isOwner = role === 'owner';
@@ -342,6 +348,18 @@ export default function Settings({ pair, refreshPair }) {
             )}
           </div>
         </GlassCard>
+
+        {/* Battery status (native Battery API) */}
+        {battery && (
+          <GlassCard className="p-4">
+            <div className="flex items-center justify-between text-sm">
+              <span style={{ color: 'var(--ink-soft)' }}>Baterie zařízení</span>
+              <span style={{ color: 'var(--ink)' }}>
+                {battery.level}% {battery.charging ? '⚡ nabíjí' : ''}
+              </span>
+            </div>
+          </GlassCard>
+        )}
 
         {/* Privacy info */}
         <GlassCard className="p-5">
