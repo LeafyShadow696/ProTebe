@@ -23,6 +23,15 @@ Production-ready Progressive Web App (PWA) s názvem „Remix: Srdce pro Michael
 - Photos: base64 data URL přímo v Mongo (vhodné pro osobní škálu).
 - PWA: standalone display, viewport-fit=cover, safe-area handling, ikony 192/512.
 
+## Implemented Features (Iteration 4 — Jan 27, 2026 night)
+- 🛠️ **FIX**: mapa byla šedá — opraveno (`react-leaflet` v4 `whenCreated` je deprecated, použito `ref={mapRef}`). Teď renderuje OSM tiles správně.
+- 🗺️ **Auto-suggest názvu místa** přes Nominatim reverse geocoding (1.1s throttle, AbortController, čeština). Klepneš do mapy → název místa se sám vyplní (např. „náměstí Míru, Vyšehrad").
+- 📍 **„You" marker** — modré kolečko označí tvou aktuální polohu na mapě (silent geolocation pokus na mount).
+- 🍎 **Apple Maps deeplink** — tlačítko *Mapy* otevře místo přímo v nativní iOS aplikaci Mapy / Google Maps na Androidu.
+- 📳 **Haptic feedback** přes Vibration API — všechna důležitá tlačítka (send, generate, save, locate, capsule pick) jemně vibrují na podporovaných zařízeních.
+- 💤 Wake Lock helper připraveno k použití (pro budoucí "Časová kapsle countdown" obrazovku).
+- 📦 **Deploy artefakty**: `vercel.json` s monorepo configem, `.gitignore` (vyloučí `.env`, `node_modules`, `__pycache__`), `.github/workflows/ci.yml` (ruff + yarn build), `README.md`, `backend/.env.example`, `frontend/.env.example`, `docs/DEPLOY_VERCEL.md` (krok za krokem), `docs/MONGODB_SETUP.md` (Atlas free tier guide).
+
 ## Implemented Features (Iteration 3 — Jan 27, 2026 late evening)
 - **Profilové fotky** — avatar upload pro tebe i partnerku v Nastavení (komprese 512px / JPEG 0.85). Zobrazují se jako CoupleAvatars na Dashboardu.
 - **Editace jména** — pencil icon u tvého jména v Nastavení, inline edit s Enter / blur save.

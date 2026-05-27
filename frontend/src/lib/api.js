@@ -1,5 +1,8 @@
 import axios from 'axios';
 
+// When REACT_APP_BACKEND_URL is set we use it as-is. On Vercel we set it to
+// '/_/backend' so calls become same-origin (no CORS, automatic auth cookies).
+// In local dev it's the FastAPI URL (http://localhost:8001).
 const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
 export const API = `${BACKEND}/api`;
 

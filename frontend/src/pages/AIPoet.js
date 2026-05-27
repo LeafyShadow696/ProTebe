@@ -6,6 +6,7 @@ import GlassCard from '../components/GlassCard';
 import { api } from '../lib/api';
 import { toAccusativeCz } from '../lib/czech';
 import { shareOrCopy } from '../lib/media';
+import { HAPTIC } from '../lib/haptics';
 
 const MOODS = [
   { key: 'tender', label: 'Něžně', desc: 'jako večerní šepot' },
@@ -25,6 +26,7 @@ export default function AIPoet({ pair }) {
   async function generate() {
     if (loading) return;
     setLoading(true);
+    HAPTIC.medium();
     try {
       const { data } = await api.post('/ai/poem', {
         pair_id: pair?.id,
