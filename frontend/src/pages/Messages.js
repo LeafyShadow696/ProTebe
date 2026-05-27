@@ -455,7 +455,7 @@ export default function Messages({ pair }) {
   );
 }
 
-function Bubble({ mine, msg, onPin, onReact }) {
+const Bubble = React.memo(function Bubble({ mine, msg, onPin, onReact }) {
   const locked = isLocked(msg);
   return (
     <motion.div
@@ -520,7 +520,7 @@ function Bubble({ mine, msg, onPin, onReact }) {
       </div>
     </motion.div>
   );
-}
+});
 
 function LockedBubble({ mine, msg }) {
   const remaining = daysUntil(msg.unlock_date);

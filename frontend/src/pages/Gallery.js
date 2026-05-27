@@ -494,35 +494,13 @@ function CameraSheet({ onClose, onCapture, onFallback }) {
   );
 }
 
-function MasonryGrid({ photos, onOpen }) {
-  const left = [];
-  const right = [];
-  photos.forEach((p, i) => (i % 2 === 0 ? left : right).push(p));
-
-  return (
-    <div className="grid grid-cols-2 gap-3" data-testid="gallery-grid">
-      <div className="space-y-3">
-        {left.map((p) => (
-          <PhotoTile key={p.id} photo={p} onOpen={onOpen} />
-        ))}
-      </div>
-      <div className="space-y-3 pt-6">
-        {right.map((p) => (
-          <PhotoTile key={p.id} photo={p} onOpen={onOpen} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PhotoTile({ photo, onOpen }) {
+const PhotoTile = React.memo(function PhotoTile({ photo, onOpen }) {
   const isVideo = photo.media_type === 'video' || photo.data_url?.startsWith('data:video/');
   return (
     <motion.button
-      layout
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
       onClick={() => onOpen(photo)}
       className="relative block w-full overflow-hidden rounded-2xl tap"
       data-testid={`photo-tile-${photo.id}`}
@@ -561,7 +539,30 @@ function PhotoTile({ photo, onOpen }) {
       )}
     </motion.button>
   );
+});
+
+function MasonryGrid({ photos, onOpen }) {
+  const left = [];
+  const right = [];
+  photos.forEach((p, i) => (i % 2 === 0 ? left : right).push(p));
+
+  return (
+    <div className="grid grid-cols-2 gap-3" data-testid="gallery-grid">
+      <div className="space-y-3">
+        {left.map((p) => (
+          <PhotoTile key={p.id} photo={p} onOpen={onOpen} />
+        ))}
+      </div>
+      <div className="space-y-3 pt-6">
+        {right.map((p) => (
+          <PhotoTile key={p.id} photo={p} onOpen={onOpen} />
+        ))}
+      </div>
+    </div>
+  );
 }
+
+
 
 function SkeletonGrid() {
   return (

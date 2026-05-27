@@ -79,6 +79,9 @@ export default function LoveDashboard({ pair }) {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [tips, setTips] = useState(loadCachedTips() || []);
   const [tipsLoading, setTipsLoading] = useState(false);
+
+  const showQuoteSkeleton = quoteLoading && !quote;
+  const showTipsSkeleton = tipsLoading && tips.length === 0;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const mood = useMemo(() => timeOfDayMood(), [tick]);
   const MoodIcon = MOOD_ICON[mood.key] || Sun;
@@ -213,17 +216,24 @@ export default function LoveDashboard({ pair }) {
             </button>
           </div>
           <AnimatePresence mode="wait">
-            <motion.p
-              key={quote || 'placeholder'}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="font-display text-2xl font-light leading-snug"
-              style={{ color: 'var(--ink)' }}
-            >
-              {quote || (quoteLoading ? 'Hledám slova…' : 'Klepnutím obnovím tichou myšlenku.')}
-            </motion.p>
+            {showQuoteSkeleton ? (
+              <div className="space-y-2 py-1">
+                <div className="h-5 w-11/12 animate-pulse rounded bg-white/10" />
+                <div className="h-5 w-8/12 animate-pulse rounded bg-white/10" />
+              </div>
+            ) : (
+              <motion.p
+                key={quote}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="font-display text-2xl font-light leading-snug"
+                style={{ color: 'var(--ink)' }}
+              >
+                {quote || 'Klepnutím obnovím tichou myšlenku.'}
+              </motion.p>
+            )}
           </AnimatePresence>
         </GlassCard>
 
@@ -250,7 +260,16 @@ export default function LoveDashboard({ pair }) {
             </button>
           </div>
           <AnimatePresence mode="wait">
-            {tips.length === 0 ? (
+            {showTipsSkeleton ? (
+              <div className="space-y-3 py-1">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex gap-3">
+                    <div className="mt-1 h-1.5 w-1.5 flex-shrink-0 animate-pulse rounded-full bg-white/15" />
+                    <div className="h-4 w-full max-w-[85%] animate-pulse rounded bg-white/10" />
+                  </div>
+                ))}
+              </div>
+            ) : tips.length === 0 ? (
               <motion.p
                 key="tips-empty"
                 initial={{ opacity: 0 }}
@@ -259,7 +278,7 @@ export default function LoveDashboard({ pair }) {
                 className="text-sm"
                 style={{ color: 'var(--ink-soft)' }}
               >
-                {tipsLoading ? 'Hledám nápady…' : 'Klepnutím navrhnu, co podniknout.'}
+                Klepnutím navrhnu, co podniknout.
               </motion.p>
             ) : (
               <motion.ul
