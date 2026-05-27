@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { api } from '../lib/api';
 import { toAccusativeCz } from '../lib/czech';
+import { shareOrCopy } from '../lib/media';
 
 const MOODS = [
   { key: 'tender', label: 'Něžně', desc: 'jako večerní šepot' },
@@ -43,21 +44,10 @@ export default function AIPoet({ pair }) {
 
   async function share() {
     if (!poem) return;
-    const shareData = {
+    await shareOrCopy({
       title: 'Pro Tebe 😍',
       text: poem,
-    };
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        /* user dismissed */
-      }
-    } else if (navigator.clipboard) {
-      await navigator.clipboard.writeText(poem);
-      // small visual hint via state
-      alert('Báseň byla zkopírována.');
-    }
+    });
   }
 
   function downloadAsImage() {

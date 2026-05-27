@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Copy, Sun, Moon, Bell, BellOff, LogOut, Heart, Shield, Sparkles, Check } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Copy, Sun, Moon, Bell, BellOff, LogOut, Heart, Shield, Sparkles, Check, Camera, Pencil } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
-import { storage } from '../lib/api';
+import Avatar from '../components/Avatar';
+import { api, storage } from '../lib/api';
+import { compressImageFile } from '../lib/media';
+import { toAccusativeCz } from '../lib/czech';
 
 export default function Settings({ pair, refreshPair }) {
   const [theme, setTheme] = useState(storage.getTheme());
@@ -11,7 +13,20 @@ export default function Settings({ pair, refreshPair }) {
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
   const [copied, setCopied] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [uploadingMine, setUploadingMine] = useState(false);
+  const [uploadingHers, setUploadingHers] = useState(false);
+  const mineFileRef = useRef(null);
+  const hersFileRef = useRef(null);
+
   const role = storage.getRole();
+  const isOwner = role === 'owner';
+  const myPhoto = isOwner ? pair?.profile_photo_owner : pair?.profile_photo_partner;
+  const partnerPhoto = isOwner ? pair?.profile_photo_partner : pair?.profile_photo_owner;
+  const myName = isOwner ? pair?.owner_name : pair?.partner_name;
+  const partnerName = isOwner ? pair?.partner_name : pair?.owner_name;
 
   function changeTheme(next) {
     setTheme(next);
@@ -52,6 +67,56 @@ export default function Settings({ pair, refreshPair }) {
     window.location.reload();
   }
 
+  async function patchPair(payload) {
+    const token = storage.getToken();
+    if (!token) return;
+    try {
+      await api.patch(`/pair/${token}`, payload);
+      if (refreshPair) await refreshPair();
+    } catch {
+      /* silent */
+    }
+  }
+
+  async function handleMyPhoto(file) {
+    if (!file) return;
+    setUploadingMine(true);
+    try {
+      const dataUrl = await compressImageFile(file, { maxDim: 512, quality: 0.85 });
+      const key = isOwner ? 'profile_photo_owner' : 'profile_photo_partner';
+      await patchPair({ [key]: dataUrl });
+    } finally {
+      setUploadingMine(false);
+    }
+  }
+
+  async function handlePartnerPhoto(file) {
+    if (!file) return;
+    setUploadingHers(true);
+    try {
+      const dataUrl = await compressImageFile(file, { maxDim: 512, quality: 0.85 });
+      const key = isOwner ? 'profile_photo_partner' : 'profile_photo_owner';
+      await patchPair({ [key]: dataUrl });
+    } finally {
+      setUploadingHers(false);
+    }
+  }
+
+  async function saveName() {
+    if (!draftName.trim()) {
+      setEditingName(false);
+      return;
+    }
+    setSavingName(true);
+    try {
+      const key = isOwner ? 'owner_name' : 'partner_name';
+      await patchPair({ [key]: draftName.trim() });
+      setEditingName(false);
+    } finally {
+      setSavingName(false);
+    }
+  }
+
   return (
     <div className="min-h-screen pb-32">
       <PageHeader
@@ -62,6 +127,106 @@ export default function Settings({ pair, refreshPair }) {
       />
 
       <div className="space-y-4 px-4">
+        {/* Profile photos */}
+        <GlassCard className="p-5" testid="profile-card">
+          <div className="mb-4 text-[10px] uppercase tracking-[0.18em]" style={{ color: 'var(--ink-soft)' }}>
+            Naše tváře
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Mine */}
+            <div className="flex flex-col items-center text-center">
+              <div className="relative">
+                <Avatar src={myPhoto} name={myName} size={76} testid="avatar-mine" />
+                <button
+                  onClick={() => mineFileRef.current?.click()}
+                  data-testid="upload-mine-btn"
+                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full glass-strong tap"
+                  aria-label="Změnit moji fotku"
+                >
+                  <Camera size={14} style={{ color: 'var(--rose)' }} />
+                </button>
+                <input
+                  ref={mineFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden-file"
+                  onChange={(e) => handleMyPhoto(e.target.files?.[0])}
+                  data-testid="file-input-mine"
+                />
+              </div>
+              <div className="mt-3 flex items-center gap-1">
+                {editingName ? (
+                  <input
+                    autoFocus
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                    onBlur={saveName}
+                    onKeyDown={(e) => e.key === 'Enter' && saveName()}
+                    className="w-24 rounded-lg border bg-transparent px-2 py-0.5 text-center text-sm outline-none"
+                    style={{ borderColor: 'var(--border)', color: 'var(--ink)' }}
+                    data-testid="name-input"
+                    disabled={savingName}
+                  />
+                ) : (
+                  <>
+                    <span className="text-[15px] font-medium" style={{ color: 'var(--ink)' }}>
+                      {myName || 'Já'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setDraftName(myName || '');
+                        setEditingName(true);
+                      }}
+                      data-testid="edit-name-btn"
+                      className="rounded-full p-1 tap"
+                      aria-label="Změnit jméno"
+                    >
+                      <Pencil size={11} style={{ color: 'var(--ink-soft)' }} />
+                    </button>
+                  </>
+                )}
+              </div>
+              {uploadingMine && (
+                <div className="mt-1 text-[10px]" style={{ color: 'var(--ink-soft)' }}>
+                  Ukládám…
+                </div>
+              )}
+            </div>
+
+            {/* Hers */}
+            <div className="flex flex-col items-center text-center">
+              <div className="relative">
+                <Avatar src={partnerPhoto} name={partnerName} size={76} testid="avatar-hers" />
+                <button
+                  onClick={() => hersFileRef.current?.click()}
+                  data-testid="upload-hers-btn"
+                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full glass-strong tap"
+                  aria-label="Změnit její fotku"
+                >
+                  <Camera size={14} style={{ color: 'var(--rose)' }} />
+                </button>
+                <input
+                  ref={hersFileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden-file"
+                  onChange={(e) => handlePartnerPhoto(e.target.files?.[0])}
+                  data-testid="file-input-hers"
+                />
+              </div>
+              <div className="mt-3 text-[15px] font-medium" style={{ color: 'var(--rose)' }}>
+                {partnerName || 'Michaelka'}
+              </div>
+              {uploadingHers && (
+                <div className="mt-1 text-[10px]" style={{ color: 'var(--ink-soft)' }}>
+                  Ukládám…
+                </div>
+              )}
+            </div>
+          </div>
+        </GlassCard>
+
         {/* Pair info */}
         <GlassCard className="p-5" testid="pair-info-card">
           <div className="flex items-center gap-3">
@@ -79,11 +244,11 @@ export default function Settings({ pair, refreshPair }) {
             </div>
           </div>
 
-          {role === 'owner' && !pair?.partner_token && pair?.code && (
+          {isOwner && !pair?.partner_token && pair?.code && (
             <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: 'var(--border)', background: 'rgba(229,179,187,0.05)' }}>
               <div className="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-[0.18em]" style={{ color: 'var(--ink-soft)' }}>
                 <Sparkles size={11} style={{ color: 'var(--rose)' }} />
-                Pár kód pro Michaelku
+                Pár kód pro {toAccusativeCz(pair?.partner_name) || 'Michaelku'}
               </div>
               <div className="flex items-center justify-between">
                 <div
@@ -111,9 +276,9 @@ export default function Settings({ pair, refreshPair }) {
               </div>
             </div>
           )}
-          {role === 'owner' && pair?.partner_token && (
+          {isOwner && pair?.partner_token && (
             <div className="mt-4 text-xs" style={{ color: 'var(--ink-soft)' }}>
-              Michaelka už je propojená ♡
+              {pair?.partner_name || 'Michaelka'} už je propojená ♡
             </div>
           )}
         </GlassCard>
@@ -220,7 +385,7 @@ export default function Settings({ pair, refreshPair }) {
         </GlassCard>
 
         <div className="px-1 pt-2 text-center text-[10px] uppercase tracking-[0.22em]" style={{ color: 'var(--ink-soft)' }}>
-          Pro Tebe · v1.1 · ♡
+          Pro Tebe · v1.2 · ♡
         </div>
       </div>
     </div>

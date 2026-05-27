@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, ChevronLeft, ChevronRight, Heart, Bell, X, Trash2, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Heart, Bell, X, Trash2, Calendar as CalendarIcon, Download, Share2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { api } from '../lib/api';
 import { formatCzechDate, shortRelativeCzech } from '../lib/dates';
 import { useSheetLock } from '../lib/hooks';
+import { downloadEventIcs } from '../lib/ics';
+import { shareOrCopy } from '../lib/media';
 
 const CZ_DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 const CZ_MONTHS_FULL = [
@@ -277,34 +279,61 @@ function EventRow({ event, onDelete }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      className="flex items-center justify-between rounded-2xl glass px-4 py-3"
+      className="rounded-2xl glass px-4 py-3"
       data-testid={`event-${event.id}`}
     >
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(229,179,187,0.12)' }}>
-          <Icon size={16} style={{ color: 'var(--rose)' }} />
-        </div>
-        <div>
-          <div className="text-[15px] font-medium" style={{ color: 'var(--ink)' }}>
-            {event.title}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(229,179,187,0.12)' }}>
+            <Icon size={16} style={{ color: 'var(--rose)' }} />
           </div>
-          {event.note && (
-            <div className="text-xs" style={{ color: 'var(--ink-soft)' }}>
-              {event.note}
+          <div>
+            <div className="text-[15px] font-medium" style={{ color: 'var(--ink)' }}>
+              {event.title}
             </div>
-          )}
+            {event.note && (
+              <div className="text-xs" style={{ color: 'var(--ink-soft)' }}>
+                {event.note}
+              </div>
+            )}
+          </div>
         </div>
+        {!event.virtual && (
+          <button
+            onClick={onDelete}
+            className="rounded-full p-2 tap"
+            aria-label="Smazat"
+            data-testid={`delete-event-${event.id}`}
+          >
+            <Trash2 size={14} style={{ color: 'var(--ink-soft)' }} />
+          </button>
+        )}
       </div>
-      {!event.virtual && (
+      <div className="mt-3 flex gap-2">
         <button
-          onClick={onDelete}
-          className="rounded-full p-2 tap"
-          aria-label="Smazat"
-          data-testid={`delete-event-${event.id}`}
+          onClick={() => downloadEventIcs(event)}
+          data-testid={`ics-event-${event.id}`}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[12px] tap"
+          style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--ink)' }}
         >
-          <Trash2 size={14} style={{ color: 'var(--ink-soft)' }} />
+          <Download size={12} />
+          Přidat do kalendáře
         </button>
-      )}
+        <button
+          onClick={() =>
+            shareOrCopy({
+              title: event.title,
+              text: `${event.title} · ${formatCzechDate(event.date)}${event.note ? ` — ${event.note}` : ''}`,
+            })
+          }
+          data-testid={`share-event-${event.id}`}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[12px] tap"
+          style={{ background: 'rgba(229,179,187,0.10)', color: 'var(--rose)' }}
+        >
+          <Share2 size={12} />
+          Sdílet
+        </button>
+      </div>
     </motion.div>
   );
 }

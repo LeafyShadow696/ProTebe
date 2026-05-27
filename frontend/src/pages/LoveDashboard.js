@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Sparkles, RefreshCw, Sun, Moon, CloudMoon, Sunrise } from 'lucide-react';
+import { Heart, Sparkles, RefreshCw, Sun, Moon, CloudMoon, Sunrise, Lightbulb, Share2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
+import { CoupleAvatars } from '../components/Avatar';
 import { api, storage } from '../lib/api';
 import { formatCzechDate, loveDuration, timeOfDayMood } from '../lib/dates';
 import { toAccusativeCz } from '../lib/czech';
+import { shareOrCopy } from '../lib/media';
 
 const MOOD_ICON = {
   morning: Sunrise,
@@ -15,6 +17,7 @@ const MOOD_ICON = {
 };
 
 const QUOTE_CACHE_KEY = 'remix.dailyQuote';
+const TIPS_CACHE_KEY = 'remix.dailyTips';
 
 function loadCachedQuote() {
   try {
@@ -34,15 +37,52 @@ function saveCachedQuote(quote) {
   localStorage.setItem(QUOTE_CACHE_KEY, JSON.stringify({ date: today, quote }));
 }
 
+function loadCachedTips() {
+  try {
+    const raw = localStorage.getItem(TIPS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const today = new Date().toISOString().slice(0, 10);
+    if (parsed.date !== today) return null;
+    return parsed.tips;
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedTips(tips) {
+  const today = new Date().toISOString().slice(0, 10);
+  localStorage.setItem(TIPS_CACHE_KEY, JSON.stringify({ date: today, tips }));
+}
+
+function currentSeasonCz() {
+  const m = new Date().getMonth() + 1;
+  if (m === 12 || m <= 2) return 'zima';
+  if (m <= 5) return 'jaro';
+  if (m <= 8) return 'léto';
+  return 'podzim';
+}
+
+function currentTimeOfDayCz() {
+  const h = new Date().getHours();
+  if (h < 6) return 'noc';
+  if (h < 11) return 'ráno';
+  if (h < 14) return 'dopoledne';
+  if (h < 18) return 'odpoledne';
+  if (h < 22) return 'večer';
+  return 'noc';
+}
+
 export default function LoveDashboard({ pair }) {
   const [tick, setTick] = useState(0);
   const [quote, setQuote] = useState(loadCachedQuote() || '');
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [tips, setTips] = useState(loadCachedTips() || []);
+  const [tipsLoading, setTipsLoading] = useState(false);
   const mood = useMemo(() => timeOfDayMood(), [tick]);
   const MoodIcon = MOOD_ICON[mood.key] || Sun;
   const fetched = useRef(false);
 
-  // Live counter — update once per second.
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
@@ -74,13 +114,40 @@ export default function LoveDashboard({ pair }) {
     }
   }
 
-  // Auto-load quote once per day.
+  async function fetchTips(force = false) {
+    if (tipsLoading) return;
+    if (!force && tips.length > 0) return;
+    setTipsLoading(true);
+    try {
+      const { data } = await api.post('/ai/dateidea', {
+        partner_name: pair?.partner_name || 'Michaelka',
+        season: currentSeasonCz(),
+        time_of_day: currentTimeOfDayCz(),
+        vibe: 'romantic',
+      });
+      const ideas = Array.isArray(data?.ideas) ? data.ideas : [];
+      if (ideas.length > 0) {
+        setTips(ideas);
+        saveCachedTips(ideas);
+      }
+    } catch {
+      /* silent */
+    } finally {
+      setTipsLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (fetched.current) return;
     fetched.current = true;
     if (!quote) fetchQuote(false);
+    if (tips.length === 0) fetchTips(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function shareTip(text) {
+    await shareOrCopy({ title: 'Pro Tebe 😍', text });
+  }
 
   return (
     <div className="min-h-screen pb-32">
@@ -107,6 +174,21 @@ export default function LoveDashboard({ pair }) {
       />
 
       <div className="space-y-4 px-4">
+        {/* Couple identity */}
+        <div className="flex items-center justify-center gap-3 pt-1" data-testid="couple-identity">
+          <CoupleAvatars
+            ownerSrc={pair?.profile_photo_owner}
+            partnerSrc={pair?.profile_photo_partner}
+            ownerName={pair?.owner_name}
+            partnerName={pair?.partner_name}
+            size={34}
+          />
+          <div className="text-[12px] tracking-wide" style={{ color: 'var(--ink-soft)' }}>
+            {pair?.owner_name || 'Já'} <span style={{ color: 'var(--rose)' }}>♡</span>{' '}
+            {pair?.partner_name || 'Michaelka'}
+          </div>
+        </div>
+
         {/* Love counter widget */}
         <LoveCounterCard duration={duration} />
 
@@ -141,6 +223,89 @@ export default function LoveDashboard({ pair }) {
             >
               {quote || (quoteLoading ? 'Hledám slova…' : 'Klepnutím obnovím tichou myšlenku.')}
             </motion.p>
+          </AnimatePresence>
+        </GlassCard>
+
+        {/* AI Date Tips — "Co spolu dnes?" */}
+        <GlassCard className="overflow-hidden p-5" testid="tips-card">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Lightbulb size={14} style={{ color: 'var(--rose)' }} />
+              <span
+                className="text-[10px] uppercase tracking-[0.22em]"
+                style={{ color: 'var(--ink-soft)' }}
+              >
+                Co spolu dnes?
+              </span>
+            </div>
+            <button
+              onClick={() => fetchTips(true)}
+              data-testid="refresh-tips-btn"
+              className="rounded-full p-2 tap"
+              aria-label="Nové nápady"
+              style={{ color: 'var(--ink-soft)' }}
+            >
+              <RefreshCw size={14} className={tipsLoading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+          <AnimatePresence mode="wait">
+            {tips.length === 0 ? (
+              <motion.p
+                key="tips-empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-sm"
+                style={{ color: 'var(--ink-soft)' }}
+              >
+                {tipsLoading ? 'Hledám nápady…' : 'Klepnutím navrhnu, co podniknout.'}
+              </motion.p>
+            ) : (
+              <motion.ul
+                key={tips.join('|')}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.4 }}
+                className="space-y-3"
+                data-testid="tips-list"
+              >
+                {tips.map((t, i) => (
+                  <motion.li
+                    key={i}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.07 }}
+                    className="flex items-start gap-3"
+                    data-testid={`tip-${i}`}
+                  >
+                    <div
+                      className="mt-1 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full"
+                      style={{ background: 'rgba(229,179,187,0.18)' }}
+                    >
+                      <Heart size={10} fill="currentColor" style={{ color: 'var(--rose)' }} />
+                    </div>
+                    <div className="flex-1">
+                      <p
+                        className="font-display text-[18px] font-light leading-snug"
+                        style={{ color: 'var(--ink)' }}
+                      >
+                        {t}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => shareTip(t)}
+                      data-testid={`share-tip-${i}`}
+                      className="rounded-full p-1.5 tap"
+                      aria-label="Sdílet nápad"
+                      style={{ color: 'var(--ink-soft)' }}
+                    >
+                      <Share2 size={13} />
+                    </button>
+                  </motion.li>
+                ))}
+              </motion.ul>
+            )}
           </AnimatePresence>
         </GlassCard>
 

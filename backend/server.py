@@ -92,6 +92,21 @@ class PairJoin(BaseModel):
     joiner_name: str = Field(default="Michaelka")
 
 
+class PairPatch(BaseModel):
+    owner_name: Optional[str] = None
+    partner_name: Optional[str] = None
+    profile_photo_owner: Optional[str] = None  # data URL
+    profile_photo_partner: Optional[str] = None
+
+
+class AiDateIdeaIn(BaseModel):
+    partner_name: str = "Michaelka"
+    season: Optional[str] = None  # zima | jaro | léto | podzim
+    time_of_day: Optional[str] = None  # ráno | dopoledne | odpoledne | večer | noc
+    weather: Optional[str] = None  # free-text like "slunečno, 22°C"
+    vibe: Optional[str] = "any"  # cozy | active | romantic | playful | any
+
+
 class MessageIn(BaseModel):
     pair_id: str
     sender_token: str
@@ -219,6 +234,21 @@ async def pair_get(token: str):
     if not pair:
         raise HTTPException(status_code=404, detail="Pair not found")
     return pair
+
+
+@app.patch("/api/pair/{token}")
+async def pair_patch(token: str, body: PairPatch):
+    pair = await db.pairs.find_one(
+        {"$or": [{"owner_token": token}, {"partner_token": token}]}
+    )
+    if not pair:
+        raise HTTPException(status_code=404, detail="Pair not found")
+    update = body.model_dump(exclude_none=True)
+    if not update:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+    await db.pairs.update_one({"id": pair["id"]}, {"$set": update})
+    pair.update(update)
+    return clean_doc(pair)
 
 
 # ---------------------------------------------------------------------------
@@ -463,3 +493,53 @@ async def ai_message(body: AiMessageIn):
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"AI selhalo: {exc}") from exc
     return {"text": text.strip(), "created_at": now_iso()}
+
+
+@app.post("/api/ai/dateidea")
+async def ai_dateidea(body: AiDateIdeaIn):
+    """Generate 3 short creative 'co spolu dnes' date ideas in Czech."""
+    system = (
+        "Jsi kreativní český průvodce pro páry. Navrhuješ konkrétní, originální a hřejivé "
+        "nápady, co dělat spolu — nikdy klišé jako 'kino + restaurace'. Mysli na atmosféru, "
+        "smysly, hru, sdílené zážitky. Píšeš česky s dokonalou diakritikou."
+    )
+    vibe_map = {
+        "cozy": "domácí, klidné, do tepla",
+        "active": "pohybové, venku, energií nabité",
+        "romantic": "romantické, jemné, intimní",
+        "playful": "hravé, s úsměvem, s rozpustilostí",
+        "any": "libovolné, podle nálady",
+    }
+    bits = []
+    if body.season:
+        bits.append(f"roční období: {body.season}")
+    if body.time_of_day:
+        bits.append(f"denní doba: {body.time_of_day}")
+    if body.weather:
+        bits.append(f"počasí: {body.weather}")
+    bits.append(f"nálada: {vibe_map.get(body.vibe or 'any', vibe_map['any'])}")
+    context = "; ".join(bits)
+
+    prompt = (
+        f"Navrhni 3 krátké nápady, co může dnes podniknout pár (já a {body.partner_name}).\n"
+        f"Kontext: {context}.\n"
+        "Každý nápad max. 14 slov, jedna věta. Bez číslování, bez odrážek, bez uvozovek.\n"
+        "Vrať přesně 3 řádky, na každém jeden nápad."
+    )
+    try:
+        text = await _ai_chat(system, prompt, session=f"date-{gen_id()[:8]}")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"AI selhalo: {exc}") from exc
+
+    # Clean lines: drop empties, leading bullets/dashes/numbers.
+    raw_lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    cleaned = []
+    for ln in raw_lines:
+        # Strip leading "1.", "- ", "• " etc.
+        while ln and ln[0] in "-•*0123456789.) ":
+            ln = ln[1:].lstrip()
+        ln = ln.strip("\"'„""")
+        if ln:
+            cleaned.append(ln)
+    ideas = cleaned[:3]
+    return {"ideas": ideas, "created_at": now_iso()}

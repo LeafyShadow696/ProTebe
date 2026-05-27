@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Camera, X, Trash2, ImagePlus } from 'lucide-react';
+import { Plus, Camera, X, Trash2, ImagePlus, Share2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import GlassCard from '../components/GlassCard';
 import { api, storage } from '../lib/api';
 import { useSheetLock } from '../lib/hooks';
+import { shareOrCopy } from '../lib/media';
 
 const MAX_DIM = 1280;
 const JPEG_QUALITY = 0.82;
@@ -298,6 +299,22 @@ function PhotoViewer({ photo, onClose, onDelete }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  async function share() {
+    // Convert data URL to File for Web Share API.
+    try {
+      const res = await fetch(photo.data_url);
+      const blob = await res.blob();
+      const file = new File([blob], 'vzpominka.jpg', { type: blob.type || 'image/jpeg' });
+      await shareOrCopy({
+        title: 'Pro Tebe 😍',
+        text: photo.caption || 'Naše vzpomínka',
+        files: [file],
+      });
+    } catch {
+      /* silent */
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -317,14 +334,24 @@ function PhotoViewer({ photo, onClose, onDelete }) {
         >
           <X size={18} style={{ color: 'var(--ink)' }} />
         </button>
-        <button
-          onClick={onDelete}
-          className="flex h-10 w-10 items-center justify-center rounded-full glass tap"
-          aria-label="Smazat"
-          data-testid="viewer-delete-btn"
-        >
-          <Trash2 size={18} style={{ color: '#F5A0AA' }} />
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={share}
+            className="flex h-10 w-10 items-center justify-center rounded-full glass tap"
+            aria-label="Sdílet"
+            data-testid="viewer-share-btn"
+          >
+            <Share2 size={18} style={{ color: 'var(--rose)' }} />
+          </button>
+          <button
+            onClick={onDelete}
+            className="flex h-10 w-10 items-center justify-center rounded-full glass tap"
+            aria-label="Smazat"
+            data-testid="viewer-delete-btn"
+          >
+            <Trash2 size={18} style={{ color: '#F5A0AA' }} />
+          </button>
+        </div>
       </div>
       <motion.div
         initial={{ scale: 0.96 }}

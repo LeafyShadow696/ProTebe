@@ -294,3 +294,73 @@ def test_ai_message():
     data = r.json()
     assert data["text"] and len(data["text"]) > 5
     assert has_czech(data["text"])
+
+
+# ---------- Pair PATCH (iteration 3) ----------
+def test_pair_patch_owner_name(pair):
+    """PATCH owner_name reflects on subsequent GET pair."""
+    r = session.patch(f"{API}/pair/{pair['owner_token']}", json={"owner_name": "TEST_Frantisek"})
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["owner_name"] == "TEST_Frantisek"
+    assert "_id" not in data
+
+    # GET pair should reflect change
+    r2 = session.get(f"{API}/pair/{pair['owner_token']}")
+    assert r2.status_code == 200
+    assert r2.json()["owner_name"] == "TEST_Frantisek"
+
+
+def test_pair_patch_profile_photos(pair):
+    """PATCH profile_photo_owner and profile_photo_partner persist."""
+    r = session.patch(f"{API}/pair/{pair['owner_token']}", json={
+        "profile_photo_owner": PNG_DATA_URL,
+        "profile_photo_partner": PNG_DATA_URL,
+    })
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["profile_photo_owner"] == PNG_DATA_URL
+    assert data["profile_photo_partner"] == PNG_DATA_URL
+
+
+def test_pair_patch_invalid_token():
+    r = session.patch(f"{API}/pair/no-such-token", json={"owner_name": "X"})
+    assert r.status_code == 404
+
+
+def test_pair_patch_empty_payload(pair):
+    r = session.patch(f"{API}/pair/{pair['owner_token']}", json={})
+    assert r.status_code == 400
+
+
+# ---------- AI date idea (iteration 3) ----------
+def test_ai_dateidea_returns_three_ideas():
+    r = session.post(f"{API}/ai/dateidea", json={
+        "partner_name": "Michaelka",
+        "season": "zima",
+        "time_of_day": "večer",
+        "weather": "slunečno, 2°C",
+        "vibe": "cozy",
+    }, timeout=45)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert "ideas" in data
+    ideas = data["ideas"]
+    assert isinstance(ideas, list)
+    assert len(ideas) == 3, f"Expected 3 ideas, got {len(ideas)}: {ideas!r}"
+    # No leading bullets / numbers / quotes
+    for idea in ideas:
+        assert idea, "idea must be non-empty"
+        assert idea[0] not in "-•*0123456789.) \"'", f"Bad leading char: {idea!r}"
+        assert not idea.startswith(("\"", "'", "„", "“")), f"Idea starts with quote: {idea!r}"
+    # At least one must include Czech diacritics
+    assert any(has_czech(i) for i in ideas), f"No Czech diacritics in ideas: {ideas!r}"
+    assert "created_at" in data
+
+
+def test_ai_dateidea_minimal_payload():
+    r = session.post(f"{API}/ai/dateidea", json={"partner_name": "Michaelka"}, timeout=45)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert isinstance(data.get("ideas"), list)
+    assert len(data["ideas"]) == 3
