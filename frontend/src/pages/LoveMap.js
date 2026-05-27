@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, MapPin, X, Trash2, Locate, Cloud, Share2 } from 'lucide-react';
+import { Plus, MapPin, X, Trash2, Locate, Cloud, Share2, Sparkles, Loader2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
-import GlassCard from '../components/GlassCard';
 import { api } from '../lib/api';
 import { useSheetLock } from '../lib/hooks';
 import { fetchWeather, getCurrentPosition } from '../lib/weather';
+import { reverseGeocode } from '../lib/geocode';
 import { shareOrCopy } from '../lib/media';
+import { HAPTIC } from '../lib/haptics';
 
 // Custom marker — rose-accent pin without external image dep.
 const heartIcon = L.divIcon({
@@ -22,6 +23,17 @@ const heartIcon = L.divIcon({
     color:#1B0E14;font-size:14px;">♡</div>`,
   iconSize: [28, 28],
   iconAnchor: [14, 14],
+});
+
+const youIcon = L.divIcon({
+  className: 'remix-you-marker',
+  html: `<div style="
+    width:18px;height:18px;border-radius:50%;
+    background:#3DA5FF;
+    box-shadow:0 0 0 8px rgba(61,165,255,0.18), 0 0 0 1.5px #fff;
+    "></div>`,
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
 });
 
 // Default location: Prague, Czech Republic.
@@ -45,10 +57,12 @@ export default function LoveMap({ pair }) {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [mapRef, setMapRef] = useState(null);
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [you, setYou] = useState(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const mapRef = useRef(null);
 
   useSheetLock(showForm);
 
@@ -67,14 +81,33 @@ export default function LoveMap({ pair }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pair?.id]);
 
+  // Try silent geolocation on mount so the map can centre on user.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const pos = await getCurrentPosition({ timeout: 6000 });
+        if (cancelled) return;
+        setYou(pos);
+      } catch {
+        /* user might deny — fine */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const center = useMemo(() => {
+    if (you) return [you.lat, you.lng];
     if (places.length > 0) return [places[0].lat, places[0].lng];
     return DEFAULT_CENTER;
-  }, [places]);
+  }, [you, places]);
 
   async function handleSave() {
     if (!picked || !title.trim() || saving) return;
     setSaving(true);
+    HAPTIC.success();
     try {
       const { data } = await api.post('/places', {
         pair_id: pair.id,
@@ -97,6 +130,7 @@ export default function LoveMap({ pair }) {
   }
 
   async function handleDelete(id) {
+    HAPTIC.warning();
     setPlaces((prev) => prev.filter((p) => p.id !== id));
     try {
       await api.delete(`/places/${id}`);
@@ -106,36 +140,54 @@ export default function LoveMap({ pair }) {
   }
 
   function locateMe() {
-    if (!navigator.geolocation || !mapRef) return;
+    if (!navigator.geolocation) return;
+    HAPTIC.selection();
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        mapRef.flyTo([pos.coords.latitude, pos.coords.longitude], 14);
+        const next = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setYou(next);
+        if (mapRef.current) mapRef.current.flyTo([next.lat, next.lng], 15);
       },
       () => {
-        /* permission denied */
+        window.alert('Nepodařilo se získat polohu. Povol prosím přístup k poloze v prohlížeči.');
       },
-      { timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
   }
 
   async function addCurrentLocation() {
     if (locating) return;
     setLocating(true);
+    HAPTIC.light();
     try {
       const { lat, lng } = await getCurrentPosition();
-      if (mapRef) mapRef.flyTo([lat, lng], 15);
+      setYou({ lat, lng });
+      if (mapRef.current) mapRef.current.flyTo([lat, lng], 15);
       setPicked({ lat, lng });
       setShowForm(true);
       setPicking(false);
-    } catch (e) {
+      // Try to suggest a name via reverse geocoding
+      suggestNameFor(lat, lng);
+    } catch {
       window.alert('Nepodařilo se získat polohu. Povol prosím přístup k poloze.');
     } finally {
       setLocating(false);
     }
   }
 
+  async function suggestNameFor(lat, lng) {
+    setSuggesting(true);
+    try {
+      const label = await reverseGeocode(lat, lng);
+      if (label) setTitle((prev) => prev || label);
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
   async function showWeatherFor(place) {
     if (weatherLoading) return;
+    HAPTIC.light();
     setWeatherLoading(true);
     setWeather({ place, data: null });
     try {
@@ -163,10 +215,17 @@ export default function LoveMap({ pair }) {
               className="flex h-10 w-10 items-center justify-center rounded-full glass-strong tap disabled:opacity-60"
               aria-label="Tady jsem"
             >
-              <Locate size={16} style={{ color: 'var(--rose)' }} className={locating ? 'animate-pulse' : ''} />
+              {locating ? (
+                <Loader2 size={16} className="animate-spin" style={{ color: 'var(--rose)' }} />
+              ) : (
+                <Locate size={16} style={{ color: 'var(--rose)' }} />
+              )}
             </button>
             <button
-              onClick={() => setPicking((p) => !p)}
+              onClick={() => {
+                HAPTIC.selection();
+                setPicking((p) => !p);
+              }}
               data-testid="toggle-pick-btn"
               className="flex h-10 w-10 items-center justify-center rounded-full glass-strong tap"
               aria-label={picking ? 'Zrušit' : 'Přidat místo'}
@@ -195,33 +254,50 @@ export default function LoveMap({ pair }) {
             zoomControl={false}
             attributionControl
             style={{ height: '100%', width: '100%' }}
-            whenCreated={setMapRef}
+            ref={mapRef}
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {picking && <ClickHandler onPick={(latlng) => { setPicked(latlng); setShowForm(true); }} />}
+            {picking && (
+              <ClickHandler
+                onPick={(latlng) => {
+                  HAPTIC.medium();
+                  setPicked(latlng);
+                  setShowForm(true);
+                  suggestNameFor(latlng.lat, latlng.lng);
+                }}
+              />
+            )}
+            {you && <Marker position={[you.lat, you.lng]} icon={youIcon} />}
             {places.map((p) => (
               <Marker key={p.id} position={[p.lat, p.lng]} icon={heartIcon}>
                 <Popup>
                   <div className="text-sm">
                     <div className="font-semibold">{p.title}</div>
                     {p.note && <div className="text-xs opacity-70">{p.note}</div>}
-                    <button
-                      onClick={() => handleDelete(p.id)}
-                      className="mt-2 text-xs"
-                      style={{ color: '#C77A8A' }}
-                    >
-                      Smazat
-                    </button>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => showWeatherFor(p)}
+                        className="text-xs"
+                        style={{ color: '#3DA5FF' }}
+                      >
+                        Počasí
+                      </button>
+                      <button
+                        onClick={() => handleDelete(p.id)}
+                        className="text-xs"
+                        style={{ color: '#C77A8A' }}
+                      >
+                        Smazat
+                      </button>
+                    </div>
                   </div>
                 </Popup>
               </Marker>
             ))}
-            {picked && (
-              <Marker position={[picked.lat, picked.lng]} icon={heartIcon} />
-            )}
+            {picked && <Marker position={[picked.lat, picked.lng]} icon={heartIcon} />}
           </MapContainer>
 
           <button
@@ -234,7 +310,10 @@ export default function LoveMap({ pair }) {
           </button>
 
           {picking && !showForm && (
-            <div className="absolute inset-x-3 bottom-3 z-[400] rounded-2xl glass-strong px-4 py-3 text-center text-sm" style={{ color: 'var(--ink)' }}>
+            <div
+              className="absolute inset-x-3 bottom-3 z-[400] rounded-2xl glass-strong px-4 py-3 text-center text-sm"
+              style={{ color: 'var(--ink)' }}
+            >
               <MapPin size={14} className="mr-2 inline" style={{ color: 'var(--rose)' }} />
               Klepni na místo, kde se ho chceš dotknout.
             </div>
@@ -248,13 +327,9 @@ export default function LoveMap({ pair }) {
               Sbírka míst ({places.length})
             </div>
             {places.map((p) => (
-              <div
-                key={p.id}
-                data-testid={`place-${p.id}`}
-                className="rounded-2xl glass px-4 py-3"
-              >
+              <div key={p.id} data-testid={`place-${p.id}`} className="rounded-2xl glass px-4 py-3">
                 <button
-                  onClick={() => mapRef?.flyTo([p.lat, p.lng], 15)}
+                  onClick={() => mapRef.current?.flyTo([p.lat, p.lng], 15)}
                   className="flex w-full items-center justify-between text-left tap"
                 >
                   <div className="flex items-center gap-3">
@@ -298,6 +373,17 @@ export default function LoveMap({ pair }) {
                     <Share2 size={12} />
                     Sdílet
                   </button>
+                  <a
+                    href={`https://maps.apple.com/?ll=${p.lat},${p.lng}&q=${encodeURIComponent(p.title)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={`open-native-${p.id}`}
+                    className="flex h-9 items-center justify-center rounded-xl px-3 text-[12px] tap"
+                    style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--ink)' }}
+                    aria-label="Otevřít v Mapách"
+                  >
+                    Mapy
+                  </a>
                   <button
                     onClick={() => handleDelete(p.id)}
                     className="flex h-9 w-9 items-center justify-center rounded-xl tap"
@@ -375,7 +461,10 @@ export default function LoveMap({ pair }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => { setShowForm(false); setPicked(null); }}
+            onClick={() => {
+              setShowForm(false);
+              setPicked(null);
+            }}
             className="fixed inset-0 z-[600] flex items-end justify-center"
             style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
           >
@@ -393,15 +482,26 @@ export default function LoveMap({ pair }) {
                   Nové místo
                 </span>
                 <button
-                  onClick={() => { setShowForm(false); setPicked(null); }}
+                  onClick={() => {
+                    setShowForm(false);
+                    setPicked(null);
+                  }}
                   className="rounded-full p-1 tap"
                   aria-label="Zavřít"
                 >
                   <X size={16} style={{ color: 'var(--ink-soft)' }} />
                 </button>
               </div>
-              <div className="mb-3 text-xs" style={{ color: 'var(--ink-soft)' }}>
-                {picked.lat.toFixed(4)}°, {picked.lng.toFixed(4)}°
+              <div className="mb-3 flex items-center gap-2 text-xs" style={{ color: 'var(--ink-soft)' }}>
+                <span>
+                  {picked.lat.toFixed(4)}°, {picked.lng.toFixed(4)}°
+                </span>
+                {suggesting && (
+                  <span className="flex items-center gap-1">
+                    <Sparkles size={11} style={{ color: 'var(--rose)' }} />
+                    hledám název…
+                  </span>
+                )}
               </div>
               <input
                 value={title}

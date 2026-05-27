@@ -1,14 +1,62 @@
+# Dependencies
 node_modules/
-.next/
-coverage/
-.DS_Store
-*.log
-.env*
-!.env.example
+**/node_modules/
+.yarn-cache/
+
+# Environment files (NEVER commit secrets)
 .env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
+.env.local
+.env.production
+.env.development
+**/.env
+!**/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build output
+build/
+dist/
+.next/
+.cache/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test reports / coverage
+coverage/
+.nyc_output/
+test_reports/
+backend/tests/__pycache__/
+
+# Internal Emergent state
+.emergent/
+_old_nextjs/
+memory/
