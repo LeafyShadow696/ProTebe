@@ -100,25 +100,31 @@ export default function LoveDashboard({ pair }) {
 
   async function fetchQuote(force = false) {
     if (quoteLoading) return;
+
+    // Always fetch on force, ignore cached state
     if (!force && quote) return;
 
     if (force) {
-      // Clear daily cache so we definitely get something new
       localStorage.removeItem(QUOTE_CACHE_KEY);
     }
+
+    // Recompute fresh time-of-day + mood right at click time
+    const freshTime = currentTimeOfDayCz();
+    const freshMood = timeOfDayMood();
 
     setQuoteLoading(true);
     try {
       const { data } = await api.post('/ai/quote', {
         partner_name: pair?.partner_name || 'Michaelka',
-        time_of_day: currentTimeOfDayCz(),
-        mood: mood.key,
-        force: force, // hint for backend to be more creative
+        time_of_day: freshTime,
+        mood: freshMood.key,
+        force: force,
+        nonce: force ? Date.now() : undefined, // extra entropy so backend never returns identical cached response
       });
       const text = (data?.quote || '').trim();
       if (text) {
         setQuote(text);
-        saveCachedQuote(text);
+        if (!force) saveCachedQuote(text); // only cache non-forced daily value
       }
     } catch {
       /* silent */
@@ -135,19 +141,23 @@ export default function LoveDashboard({ pair }) {
       localStorage.removeItem(TIPS_CACHE_KEY);
     }
 
+    const freshTime = currentTimeOfDayCz();
+    const freshMood = timeOfDayMood(); // we can still pass vibe, but time is fresh
+
     setTipsLoading(true);
     try {
       const { data } = await api.post('/ai/dateidea', {
         partner_name: pair?.partner_name || 'Michaelka',
         season: currentSeasonCz(),
-        time_of_day: currentTimeOfDayCz(),
+        time_of_day: freshTime,
         vibe: 'romantic',
         force: force,
+        nonce: force ? Date.now() : undefined,
       });
       const ideas = Array.isArray(data?.ideas) ? data.ideas : [];
       if (ideas.length > 0) {
         setTips(ideas);
-        saveCachedTips(ideas);
+        if (!force) saveCachedTips(ideas);
       }
     } catch {
       /* silent */

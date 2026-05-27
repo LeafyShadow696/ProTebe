@@ -622,13 +622,14 @@ async def ai_quote(body: AiQuoteIn):
     }.get(body.mood or "", "")
 
     forceHint = " Vytvoř něco úplně nového a svěžího, co jsi ještě nenapsal." if body.force else ""
+    nonceHint = f" (variace {body.nonce})" if getattr(body, 'nonce', None) else ""
 
     prompt = (
         f"Vytvoř jednu krátkou (max. 18 slov) milostnou myšlenku pro {body.partner_name}. "
         f"Tón by měl být {time_tone}. "
         f"{('Atmosféra: ' + mood_text + '. ') if mood_text else ''}"
         "Bez nadpisu, bez podpisu, bez uvozovek. Pouze samotný citát na jednom řádku."
-        f"{forceHint}"
+        f"{forceHint}{nonceHint}"
     )
     try:
         text = await _ai_chat(system, prompt, session=f"quote-{gen_id()[:8]}")
@@ -692,13 +693,14 @@ async def ai_dateidea(body: AiDateIdeaIn):
     context = "; ".join(bits)
 
     forceHint = "\nVytvoř úplně nové a originální nápady, které jsi ještě nenavrhl." if getattr(body, 'force', False) else ""
+    nonceHint = f"\n(variace {getattr(body, 'nonce', None)})" if getattr(body, 'nonce', None) else ""
 
     prompt = (
         f"Navrhni 3 krátké nápady, co může dnes podniknout pár (já a {body.partner_name}).\n"
         f"Kontext: {context}.\n"
         "Každý nápad max. 14 slov, jedna věta. Bez číslování, bez odrážek, bez uvozovek.\n"
         "Vrať přesně 3 řádky, na každém jeden nápad."
-        f"{forceHint}"
+        f"{forceHint}{nonceHint}"
     )
     try:
         text = await _ai_chat(system, prompt, session=f"date-{gen_id()[:8]}")
@@ -762,3 +764,12 @@ async def push_unsubscribe(body: dict):
         ]
 
     return {"success": True}
+
+
+@app.get("/api/push/public-key")
+async def push_public_key():
+    """Return the VAPID public key so the frontend can create proper push subscriptions."""
+    pub = os.environ.get("VAPID_PUBLIC_KEY")
+    if not pub:
+        return {"publicKey": None, "configured": False}
+    return {"publicKey": pub, "configured": True}

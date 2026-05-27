@@ -3,8 +3,26 @@
  * Handles subscription + communication with backend
  */
 
-/* eslint-disable no-unused-vars */
-const VAPID_PUBLIC_KEY = null; // Will be fetched from backend if needed
+export async function getVapidPublicKey() {
+  try {
+    const res = await fetch('/api/push/public-key');
+    const data = await res.json();
+    return data.publicKey || null;
+  } catch {
+    return null;
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 export async function subscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -17,17 +35,14 @@ export async function subscribeToPush() {
   let subscription = await registration.pushManager.getSubscription();
 
   if (!subscription) {
-    // We need VAPID public key from backend for real push.
-    // For now we create a subscription (it will work with a real key later).
-    // Many browsers allow creating a subscription even without applicationServerKey in some cases,
-    // but for production you MUST provide it.
+    const vapidKey = await getVapidPublicKey();
 
     try {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        // applicationServerKey will be required in production
-        // applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
+      const options = { userVisibleOnly: true };
+      if (vapidKey) {
+        options.applicationServerKey = urlBase64ToUint8Array(vapidKey);
+      }
+      subscription = await registration.pushManager.subscribe(options);
     } catch (err) {
       console.error('Failed to subscribe to push:', err);
       throw err;
@@ -41,7 +56,6 @@ export async function subscribeToPush() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         subscription: subscription.toJSON(),
-        // We can send the current pair token so backend knows who to notify
         token: localStorage.getItem('remix.token'),
       }),
     });
@@ -79,14 +93,3 @@ export async function getPushSubscription() {
   return registration.pushManager.getSubscription();
 }
 
-// Helper to convert VAPID key (not used yet but ready for production)
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
