@@ -125,6 +125,63 @@ def test_messages_patch_not_found():
     assert r.status_code == 404
 
 
+# ---------- Time Capsule (unlock_date) ----------
+def test_message_without_unlock_date_is_null(pair):
+    """Backward compat: omitted unlock_date returns null in response."""
+    r = session.post(f"{API}/messages", json={
+        "pair_id": pair["id"],
+        "sender_token": pair["owner_token"],
+        "sender_name": "TEST_Owner",
+        "text": "TEST_no_capsule",
+    })
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert "unlock_date" in data
+    assert data["unlock_date"] is None
+    session.delete(f"{API}/messages/{data['id']}")
+
+
+def test_message_with_unlock_date_persisted(pair):
+    """POST with unlock_date stores it and GET list includes the field."""
+    unlock = "2027-01-15"
+    r = session.post(f"{API}/messages", json={
+        "pair_id": pair["id"],
+        "sender_token": pair["owner_token"],
+        "sender_name": "TEST_Owner",
+        "text": "TEST_capsule_message",
+        "unlock_date": unlock,
+    })
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["unlock_date"] == unlock
+    msg_id = data["id"]
+
+    # Verify via GET list
+    r = session.get(f"{API}/messages/{pair['id']}")
+    assert r.status_code == 200
+    found = [m for m in r.json() if m["id"] == msg_id]
+    assert found, "Created capsule message not found in list"
+    assert found[0]["unlock_date"] == unlock
+    # all returned messages should have unlock_date field (even null for old ones)
+    for m in r.json():
+        assert "unlock_date" in m
+    session.delete(f"{API}/messages/{msg_id}")
+
+
+def test_message_with_explicit_null_unlock_date(pair):
+    """Explicit null unlock_date is accepted."""
+    r = session.post(f"{API}/messages", json={
+        "pair_id": pair["id"],
+        "sender_token": pair["owner_token"],
+        "sender_name": "TEST_Owner",
+        "text": "TEST_null_capsule",
+        "unlock_date": None,
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["unlock_date"] is None
+    session.delete(f"{API}/messages/{r.json()['id']}")
+
+
 # ---------- Photos ----------
 def test_photos_crud(pair):
     # invalid data url -> 400

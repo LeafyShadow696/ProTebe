@@ -10,7 +10,7 @@ import GlassCard from '../components/GlassCard';
  */
 export default function Onboarding({ onReady }) {
   const [mode, setMode] = useState(null); // null | 'create' | 'join'
-  const [ownerName, setOwnerName] = useState('');
+  const [ownerName, setOwnerName] = useState('František');
   const [partnerName, setPartnerName] = useState('Michaelka');
   const [joinCode, setJoinCode] = useState('');
   const [joinName, setJoinName] = useState('Michaelka');
@@ -81,16 +81,16 @@ export default function Onboarding({ onReady }) {
             className="text-[11px] uppercase tracking-[0.32em]"
             style={{ color: 'var(--ink-soft)' }}
           >
-            Remix
+            Pro Tebe
           </p>
           <h1
             className="mt-2 font-display text-5xl font-light leading-[1.05] tracking-tight"
             style={{ color: 'var(--ink)' }}
           >
-            Srdce pro
+            Můj tichý
             <br />
             <em className="not-italic" style={{ color: 'var(--rose)' }}>
-              Michaelku
+              svět s tebou
             </em>
           </h1>
           <p
@@ -171,7 +171,7 @@ export default function Onboarding({ onReady }) {
                   label="Tvé jméno"
                   value={ownerName}
                   onChange={setOwnerName}
-                  placeholder="např. Honza"
+                  placeholder="František"
                   testid="input-owner-name"
                 />
                 <Field

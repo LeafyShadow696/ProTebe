@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 2 testing: backend unlock_date/Time Capsule field + frontend rebrand & Time Capsule UI. Backend 100% pass (21/21 incl. 3 new unlock_date tests). Frontend rebrand and core capsule flows pass; one UI overlay bug found preventing reliable click on capsule-custom-apply and capsule-remove on 430x900 viewport (bottom-tab-bar intercepts pointer events at the bottom of CapsuleSheet).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Messages.js > CapsuleSheet",
+        "issue": "On viewport 430x900 the bottom navigation (BottomTabBar) overlaps and intercepts pointer events for the lower part of the time-capsule sheet. Buttons [data-testid='capsule-custom-apply'] and [data-testid='capsule-remove'] are visually overlapped by the bottom-tab-bar and cannot be clicked reliably (Playwright reports pointer events intercepted by bottom-tab-bar; even with the modal backdrop at z-50 vs nav at z-30, the rendered tab bar shows through and intercepts clicks — suggests an unwanted stacking context above the modal or insufficient bottom padding on the sheet).",
+        "selector": "[data-testid='capsule-custom-apply'], [data-testid='capsule-remove']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Messages — Time Capsule sheet (430x900)",
+        "issues": [
+          "Modal backdrop (rgba 0.55, z-50) does NOT visually cover the bottom-tab-bar — bottom navigation is still bright/visible while modal is open. Likely cause: a stacking context promotes bottom-tab-bar above the z-50 modal, OR the sheet/backdrop should add bottom padding equal to tab-bar height to avoid overlap."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix CapsuleSheet stacking: ensure modal backdrop (z-50) renders ABOVE BottomTabBar (z-30). Either bump CapsuleSheet z-index to z-[60] / z-[70], OR hide BottomTabBar when any modal/sheet is open, OR add bottom-padding (~90px or pb-[90px]) to the sheet's inner content so its bottom buttons sit above the fixed bottom-tab-bar.",
+    "After fix, ensure capsule-custom-apply and capsule-remove receive click events without needing force=True."
+  ],
+  "critical_code_review_comments": [
+    "Messages.js (652 lines) approaching the 700-line guideline — consider extracting CapsuleSheet, Composer, Bubble, LockedBubble, ReactionPopover into separate files.",
+    "Backend MessageIn correctly added optional unlock_date (str|None) and is backward-compatible — verified via tests.",
+    "All capsule data-testid attributes present per spec (capsule-btn, capsule-sheet, capsule-preset-{key}, capsule-custom-date, capsule-custom-apply, capsule-remove, capsule-clear-btn, capsule-indicator, locked-{id}).",
+    "Rebrand fully applied: title 'Pro Tebe 😍', manifest, onboarding kicker 'PRO TEBE', defaults František/Michaelka, settings footer 'Pro Tebe · v1.1 · ♡'."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added 3 unlock_date tests: test_message_without_unlock_date_is_null, test_message_with_unlock_date_persisted, test_message_with_explicit_null_unlock_date)"
+  ],
+  "success_rate": {
+    "backend": "100% (21/21 incl. 3 new unlock_date tests)",
+    "frontend": "85% — rebrand OK, month/week presets OK, clear OK, LockedBubble (dashed border + 'Tvoje kapsle' + 'Čeká pro ni' + 'Otevře se ... za N dní') OK, 7-tab navigation OK, Settings footer OK. FAIL: custom-date apply and capsule-remove blocked by bottom-tab-bar overlay."
+  },
+  "test_credentials": "none (anonymous app)",
+  "seed_data_creation": "Pair seeded ad-hoc via fetch('/api/pair/create') during browser tests; backend tests clean up TEST_ prefixed messages.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression file is /app/backend/tests/backend_test.py (now 21 tests). For frontend, seed pair via POST /api/pair/create then localStorage.setItem('remix.token', owner_token), localStorage.setItem('remix.pair', JSON.stringify(data)), localStorage.setItem('remix.role','owner') and reload to skip onboarding. After E1 fixes the capsule sheet stacking issue, retest: (1) click capsule-custom-apply without force — should set indicator with the custom date; (2) click capsule-remove without force — indicator should disappear; (3) verify bottom-tab-bar is visually hidden or dimmed when CapsuleSheet is open.",
+  "rca_of_the_issue": "RCA: CapsuleSheet root motion.div uses `fixed inset-0 z-50`. BottomTabBar nav is `fixed inset-x-0 bottom-0 z-30` (parent pointer-events-none; inner div pointer-events-auto). On the test viewport (430x900), the sheet's content (with pb-safe only) extends down into the same y-range occupied by the bottom-tab-bar. Although CapsuleSheet has higher z-index numerically, the bottom-tab-bar is visually rendered above the modal backdrop AND its pointer-events-auto child captures clicks on capsule-custom-apply and capsule-remove. Likely cause: a parent of BottomTabBar (or BottomTabBar itself via filter/transform/will-change) creates a stacking context that wins against the modal's z-50, OR the modal backdrop is rendered inside a container with isolation that prevents it from overlaying the nav. Reproduction: viewport 430x900 → seed pair → /messages → click capsule-btn → capsule sheet opens with bottom-tab-bar still visible and clickable below; clicking capsule-custom-apply or capsule-remove triggers Playwright 'subtree intercepts pointer events' from bottom-tab-bar. Mitigation options: (a) raise CapsuleSheet z-index to z-[60]+; (b) hide/dim BottomTabBar when any sheet/modal is open via context flag; (c) increase the sheet's bottom padding to clear the tab bar (e.g. `pb-[calc(env(safe-area-inset-bottom)+96px)]`)."
+}

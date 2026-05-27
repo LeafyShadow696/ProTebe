@@ -33,13 +33,13 @@ export default function Settings({ pair, refreshPair }) {
   async function requestNotifications() {
     if (typeof Notification === 'undefined') return;
     if (Notification.permission === 'granted') {
-      new Notification('Remix', { body: 'Notifikace už jsou povolené ♡', icon: '/icon-192.svg' });
+      new Notification('Pro Tebe 😍', { body: 'Notifikace už jsou povolené ♡', icon: '/icon-192.svg' });
       return;
     }
     const result = await Notification.requestPermission();
     setNotifyState(result);
     if (result === 'granted') {
-      new Notification('Remix', {
+      new Notification('Pro Tebe 😍', {
         body: 'Budu tě jemně upozorňovat na výročí a nové vzkazy.',
         icon: '/icon-192.svg',
       });
@@ -220,7 +220,7 @@ export default function Settings({ pair, refreshPair }) {
         </GlassCard>
 
         <div className="px-1 pt-2 text-center text-[10px] uppercase tracking-[0.22em]" style={{ color: 'var(--ink-soft)' }}>
-          Remix · v1.0 · ♡
+          Pro Tebe · v1.1 · ♡
         </div>
       </div>
     </div>

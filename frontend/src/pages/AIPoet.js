@@ -44,7 +44,7 @@ export default function AIPoet({ pair }) {
   async function share() {
     if (!poem) return;
     const shareData = {
-      title: 'Pro Michaelku',
+      title: 'Pro Tebe 😍',
       text: poem,
     };
     if (navigator.share) {
@@ -92,7 +92,7 @@ export default function AIPoet({ pair }) {
     ctx.fillStyle = '#E5B3BB';
     ctx.font = '300 36px Cormorant Garamond, Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText('PRO MICHAELKU', W / 2, 180);
+    ctx.fillText(`PRO ${(toAccusativeCz(pair?.partner_name) || 'TEBE').toUpperCase()}`, W / 2, 180);
 
     // Poem text
     ctx.fillStyle = '#FAFAFA';
@@ -108,12 +108,12 @@ export default function AIPoet({ pair }) {
     // Footer
     ctx.fillStyle = 'rgba(250,250,250,0.5)';
     ctx.font = '300 24px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.fillText('Remix · Srdce pro Michaelku', W / 2, H - 120);
+    ctx.fillText('Pro Tebe 😍', W / 2, H - 120);
 
     const url = canvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = url;
-    a.download = `remix-basen-${Date.now()}.png`;
+    a.download = `pro-tebe-basen-${Date.now()}.png`;
     a.click();
   }
 

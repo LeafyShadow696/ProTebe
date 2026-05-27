@@ -53,7 +53,7 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-app = FastAPI(title="Remix — Srdce pro Michaelku")
+app = FastAPI(title="Pro Tebe 😍")
 
 app.add_middleware(
     CORSMiddleware,
@@ -98,6 +98,7 @@ class MessageIn(BaseModel):
     sender_name: str
     text: str
     voice_seconds: Optional[float] = None
+    unlock_date: Optional[str] = None  # ISO date — if set, recipient sees it only after that time
 
 
 class MessagePatch(BaseModel):
@@ -238,6 +239,7 @@ async def messages_create(body: MessageIn):
         "sender_name": body.sender_name,
         "text": body.text,
         "voice_seconds": body.voice_seconds,
+        "unlock_date": body.unlock_date,
         "pinned": False,
         "reaction": None,
         "created_at": now_iso(),
