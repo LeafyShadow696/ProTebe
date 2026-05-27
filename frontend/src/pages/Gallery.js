@@ -61,17 +61,36 @@ function compressImage(file) {
   });
 }
 
-/** Read a video File as data URL, with a hard size cap. */
+/** Read a video File as data URL, with size + duration checks for better UX. */
 function readVideo(file) {
   return new Promise((resolve, reject) => {
     if (file.size > MAX_VIDEO_BYTES) {
       reject(new Error(`Video je příliš velké (${Math.round(file.size / 1024 / 1024)} MB). Maximum je 12 MB.`));
       return;
     }
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error);
-    reader.onload = () => resolve(reader.result);
-    reader.readAsDataURL(file);
+
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      URL.revokeObjectURL(video.src);
+
+      // Warn for very long videos (better than hard block)
+      if (duration > 180) {
+        reject(new Error('Video je delší než 3 minuty. Zkuste kratší klip pro lepší zážitek.'));
+        return;
+      }
+
+      // Proceed with reading
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    };
+
+    video.onerror = () => reject(new Error('Nelze načíst video.'));
+    video.src = URL.createObjectURL(file);
   });
 }
 
@@ -698,17 +717,33 @@ function PhotoViewer({ photo, onClose, onDelete }) {
     }
   }
 
+  // iOS-style drag to dismiss
+  const [dragY, setDragY] = useState(0);
+
+  const handleDragEnd = (event, info) => {
+    if (info.offset.y > 120 || info.velocity.y > 600) {
+      onClose();
+    } else {
+      setDragY(0);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.2 }}
       className="fixed inset-0 z-50 flex flex-col"
-      style={{ background: 'rgba(8,8,12,0.95)', backdropFilter: 'blur(20px)' }}
+      style={{ background: 'rgba(8,8,12,0.96)', backdropFilter: 'blur(24px)' }}
       data-testid="photo-viewer"
     >
-      <div className="flex items-center justify-between p-3 pt-safe">
+      {/* iOS-style drag handle */}
+      <div className="flex justify-center pt-2 pb-1">
+        <div className="h-1 w-9 rounded-full bg-white/20" />
+      </div>
+
+      <div className="flex items-center justify-between px-3 pb-2">
         <button
           onClick={onClose}
           className="flex h-10 w-10 items-center justify-center rounded-full glass tap"
@@ -736,11 +771,19 @@ function PhotoViewer({ photo, onClose, onDelete }) {
           </button>
         </div>
       </div>
+      {/* Main content area - draggable vertically like iOS Photos */}
       <motion.div
-        initial={{ scale: 0.96 }}
-        animate={{ scale: 1 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-1 items-center justify-center px-4"
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.2}
+        onDrag={(e, info) => setDragY(info.offset.y)}
+        onDragEnd={handleDragEnd}
+        style={{
+          y: dragY,
+          opacity: Math.max(0.3, 1 - Math.abs(dragY) / 400),
+        }}
+        transition={{ type: 'spring', stiffness: 280, damping: 30 }}
+        className="flex flex-1 items-center justify-center px-4 touch-pan-y"
       >
         {isVideo ? (
           <video
@@ -749,12 +792,14 @@ function PhotoViewer({ photo, onClose, onDelete }) {
             playsInline
             autoPlay
             className="max-h-full max-w-full rounded-2xl"
+            style={{ transform: `scale(${Math.max(0.85, 1 - Math.abs(dragY) / 800)})` }}
           />
         ) : (
           <img
             src={photo.data_url}
             alt={photo.caption || 'vzpomínka'}
             className="max-h-full max-w-full rounded-2xl object-contain"
+            style={{ transform: `scale(${Math.max(0.9, 1 - Math.abs(dragY) / 700)})` }}
           />
         )}
       </motion.div>

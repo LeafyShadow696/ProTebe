@@ -497,6 +497,24 @@ async def events_create(body: EventIn):
         "created_at": now_iso(),
     }
     await db.events.insert_one(event.copy())
+
+    # Send push notification to the pair when a new event is created
+    if PUSH_ENABLED and body.pair_id in push_subscriptions:
+        for sub in push_subscriptions.get(body.pair_id, []):
+            try:
+                webpush(
+                    subscription_info=sub,
+                    data=json.dumps({
+                        "title": "Pro Tebe",
+                        "body": `Nový event: ${body.title}`,
+                        "url": "/calendar",
+                    }),
+                    vapid_private_key=os.environ.get("VAPID_PRIVATE_KEY"),
+                    vapid_claims={"sub": "mailto:admin@pro-tebe.app"}
+                )
+            except Exception:
+                pass
+
     return clean_doc(event)
 
 
