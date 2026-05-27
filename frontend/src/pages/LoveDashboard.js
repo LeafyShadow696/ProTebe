@@ -142,7 +142,6 @@ export default function LoveDashboard({ pair }) {
     }
 
     const freshTime = currentTimeOfDayCz();
-    const freshMood = timeOfDayMood(); // we can still pass vibe, but time is fresh
 
     setTipsLoading(true);
     try {
