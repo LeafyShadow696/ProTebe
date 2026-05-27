@@ -7,6 +7,7 @@ import { toAccusativeCz } from '../lib/czech';
 import { formatCzechDate } from '../lib/dates';
 import { useSheetLock } from '../lib/hooks';
 import { HAPTIC } from '../lib/haptics';
+import { queueMessage, processQueue, getQueuedMessages } from '../lib/offlineQueue';
 
 const REACTIONS = ['❤️', '😊', '🥺', '🔥', '🌹'];
 const POLL_INTERVAL = 4000;
@@ -98,10 +99,9 @@ export default function Messages({ pair }) {
   async function sendMessage(content) {
     const t = (content ?? text).trim();
     if (!t || sending) return;
-    setSending(true);
-    HAPTIC.light();
+
     const myName = role === 'partner' ? pair.partner_name : pair.owner_name;
-    const optimistic = {
+    const messagePayload = {
       id: `tmp-${Date.now()}`,
       pair_id: pair.id,
       sender_token: meToken,
@@ -112,10 +112,25 @@ export default function Messages({ pair }) {
       unlock_date: capsuleDate,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, optimistic]);
+
+    // Optimistic update
+    setMessages((prev) => [...prev, messagePayload]);
     setText('');
     const sentCapsule = capsuleDate;
     setCapsuleDate(null);
+
+    const isOnline = navigator.onLine;
+
+    if (!isOnline) {
+      // Queue for later
+      queueMessage({ ...messagePayload, capsuleDate: sentCapsule });
+      HAPTIC.selection();
+      return;
+    }
+
+    setSending(true);
+    HAPTIC.light();
+
     try {
       const { data } = await api.post('/messages', {
         pair_id: pair.id,
@@ -124,13 +139,51 @@ export default function Messages({ pair }) {
         text: t,
         unlock_date: sentCapsule,
       });
-      setMessages((prev) => prev.map((m) => (m.id === optimistic.id ? data : m)));
-    } catch {
-      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setMessages((prev) => prev.map((m) => (m.id === messagePayload.id ? data : m)));
+    } catch (err) {
+      // If it fails, queue it
+      queueMessage({ ...messagePayload, capsuleDate: sentCapsule });
+      setMessages((prev) => prev.filter((m) => m.id !== messagePayload.id));
     } finally {
       setSending(false);
     }
   }
+
+  // Process queue when coming back online or when SW requests sync
+  const processMessageQueue = async () => {
+    const queued = getQueuedMessages();
+    if (queued.length === 0) return;
+
+    try {
+      await processQueue(async (msg) => {
+        const { data } = await api.post('/messages', {
+          pair_id: msg.pair_id,
+          sender_token: msg.sender_token,
+          sender_name: msg.sender_name,
+          text: msg.text,
+          unlock_date: msg.unlock_date,
+        });
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msg.id ? data : m))
+        );
+      });
+    } catch (e) {
+      // Will retry later
+    }
+  };
+
+  useEffect(() => {
+    const handleOnline = () => processMessageQueue();
+    const handleSync = () => processMessageQueue();
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('sw-sync-messages', handleSync);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('sw-sync-messages', handleSync);
+    };
+  }, []);
 
   async function togglePin(msg) {
     const next = !msg.pinned;
