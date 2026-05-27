@@ -153,8 +153,19 @@ export default function LoveDashboard({ pair }) {
     await shareOrCopy({ title: 'Pro Tebe 😍', text });
   }
 
+  // Dynamic time-of-day atmosphere (gradient from timeOfDayMood)
+  const timeGradient = mood.gradient || '';
+
   return (
-    <div className="min-h-screen pb-32">
+    <div className="min-h-screen pb-32 relative">
+      {/* Time-of-day atmosphere layer - subtle gradient that changes throughout the day */}
+      {timeGradient && (
+        <div 
+          className={`fixed inset-0 pointer-events-none z-0 bg-gradient-to-b ${timeGradient} transition-all duration-1000 ease-out`}
+          aria-hidden="true"
+        />
+      )}
+
       <PageHeader
         kicker={mood.label}
         title={
