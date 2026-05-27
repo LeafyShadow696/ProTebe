@@ -6,6 +6,7 @@ import { api, storage } from '../lib/api';
 import { toAccusativeCz } from '../lib/czech';
 import { formatCzechDate } from '../lib/dates';
 import { useSheetLock } from '../lib/hooks';
+import { HAPTIC } from '../lib/haptics';
 
 const REACTIONS = ['❤️', '😊', '🥺', '🔥', '🌹'];
 const POLL_INTERVAL = 4000;
@@ -98,6 +99,7 @@ export default function Messages({ pair }) {
     const t = (content ?? text).trim();
     if (!t || sending) return;
     setSending(true);
+    HAPTIC.light();
     const myName = role === 'partner' ? pair.partner_name : pair.owner_name;
     const optimistic = {
       id: `tmp-${Date.now()}`,

@@ -7,6 +7,7 @@
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
 let lastCall = 0;
+let activeController = null;
 
 async function throttle() {
   const now = Date.now();
@@ -19,11 +20,19 @@ async function throttle() {
 
 /** Convert lat/lng to a friendly Czech place label (best-effort). */
 export async function reverseGeocode(lat, lng) {
+  // Cancel any in-flight call so navigating away doesn't fill stale data.
+  if (activeController) activeController.abort();
+  activeController = new AbortController();
+  const signal = activeController.signal;
+
   await throttle();
+  if (signal.aborted) return null;
+
   const url = `${NOMINATIM_URL}?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=cs&zoom=16`;
   try {
     const res = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
+      headers: { Accept: 'application/json' },
+      signal,
     });
     if (!res.ok) return null;
     const data = await res.json();
