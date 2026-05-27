@@ -60,6 +60,9 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY") or os.environ.get("EMERGEN
 
 USE_MEMORY = MONGO_URL.startswith("memory") or not MONGO_URL
 
+# Push subscriptions storage (simple in-memory for now)
+push_subscriptions: dict[str, list[dict]] = {}
+
 if USE_MEMORY:
     # Lightweight in-memory store for local dev & live preview (no Mongo needed)
     _mem: dict[str, dict] = {"pairs": {}, "messages": {}, "photos": {}, "events": {}, "places": {}, "poems": {}}
@@ -137,9 +140,6 @@ if USE_MEMORY:
             return _get_coll(name)
     db = MemDB()
     print("[backend] Running in MEMORY mode (no MongoDB). Great for live preview!")
-
-# Push subscriptions storage (simple in-memory for now)
-push_subscriptions: dict[str, list[dict]] = {}
 else:
     client = AsyncIOMotorClient(MONGO_URL)
     db = client[DB_NAME]
