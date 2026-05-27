@@ -2,14 +2,48 @@
 
 Tento návod nasadí backend (FastAPI + MongoDB) na Railway s tvými reálnými credentials.
 
-## 1. Vygeneruj Railway Token (důležité!)
+## Nejjednodušší cesta: Deploy přes webové rozhraní Railway (doporučeno)
 
-1. Jdi na: https://railway.app/account/tokens
-2. Klikni **New Token**
-3. Pojmenuj ho např. `ProTebe Backend`
-4. **Zkopíruj celý vygenerovaný token** (je dlouhý)
+Tato metoda **nevyžaduje žádný token**. Je nejrychlejší.
 
-## 2. Nasazení (pomocí CLI)
+1. Jdi na [https://railway.app](https://railway.app) a přihlas se přes GitHub.
+2. Klikni **New Project** → **Deploy from GitHub repo**.
+3. Vyber repozitář `ProTebe`.
+4. **Důležité**: Po načtení vyber jako Root Directory složku `backend` (ne celý projekt).
+5. Railway by měl najít `railway.toml`.
+6. Před deployem klikni na **Variables** a přidej tyto tři proměnné:
+
+   | Název              | Hodnota |
+   |--------------------|---------|
+   | `MONGO_URL`        | `mongodb+srv://leafyshadow696_db_user:nqUttOTAsSVkuzAD@cluster0.dh1xfbo.mongodb.net/pro_tebe?retryWrites=true&w=majority` |
+   | `DB_NAME`          | `pro_tebe` |
+   | `EMERGENT_LLM_KEY` | `sk-emergent-5471c4612E08eDb12C` |
+
+7. Klikni **Deploy**.
+
+Po dokončení ti Railway ukáže URL (např. `https://pro-tebe-backend.up.railway.app`).
+
+Pošli mi tu URL a já ihned:
+- Nastavím ji na Vercel jako `REACT_APP_BACKEND_URL`
+- Spustím redeploy
+- Propojím vše na `pwnz.shop`
+
+---
+
+## Alternativa: Pomocí Railway CLI (vyžaduje token)
+
+Pokud chceš použít CLI, musíš mít **správný Account Token** (ne UUID projektu/služby).
+
+### Jak získat správný token
+
+1. Jdi přesně na: **https://railway.app/account/tokens**
+2. Klikni velké modré tlačítko **New Token**
+3. Pojmenuj ho (např. `ProTebe Backend`)
+4. Zkopíruj **celý vygenerovaný token** (je dlouhý řetězec, ne UUID ve tvaru `xxxx-xxxx-xxxx`)
+
+**Poznámka:** UUID hodnoty, které jsi posílal dříve (jako `c72681f4-...`), jsou ID projektu/služby, ne API tokeny. Ty nefungují pro přihlášení.
+
+## Nasazení pomocí CLI (po získání platného tokenu)
 
 ```bash
 # Nastav token (nahraď svým)
