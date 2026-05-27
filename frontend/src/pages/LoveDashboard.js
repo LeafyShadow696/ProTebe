@@ -262,10 +262,10 @@ export default function LoveDashboard({ pair }) {
             ) : (
               <motion.p
                 key={quote}
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ type: 'spring', stiffness: 180, damping: 26, mass: 0.8 }}
                 className="font-display text-2xl font-light leading-snug"
                 style={{ color: 'var(--ink)' }}
               >
@@ -324,10 +324,10 @@ export default function LoveDashboard({ pair }) {
             ) : (
               <motion.ul
                 key={tips.join('|')}
-                initial={{ opacity: 0, y: 4 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.4 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 28 }}
                 className="space-y-3"
                 data-testid="tips-list"
               >

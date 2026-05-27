@@ -621,11 +621,18 @@ const PhotoTile = React.memo(function PhotoTile({ photo, onOpen }) {
   const isVideo = photo.media_type === 'video' || photo.data_url?.startsWith('data:video/');
   return (
     <motion.button
-      whileHover={{ scale: 1.01 }}
-      whileTap={{ scale: 0.985 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+      initial={{ opacity: 0, y: 12, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileHover={{ scale: 1.008 }}
+      whileTap={{ scale: 0.978 }}
+      transition={{ 
+        type: 'spring', 
+        stiffness: 240, 
+        damping: 26, 
+        mass: 0.8 
+      }}
       onClick={() => onOpen(photo)}
-      className="relative block w-full overflow-hidden rounded-2xl tap active:scale-[0.985]"
+      className="relative block w-full overflow-hidden rounded-2xl tap"
       data-testid={`photo-tile-${photo.id}`}
     >
       {isVideo ? (
@@ -783,7 +790,7 @@ function PhotoViewer({ photo, onClose, onDelete }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-50 flex flex-col"
       style={{ background: 'rgba(8,8,12,0.96)', backdropFilter: 'blur(24px)' }}
       data-testid="photo-viewer"
@@ -825,14 +832,14 @@ function PhotoViewer({ photo, onClose, onDelete }) {
       <motion.div
         drag="y"
         dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={0.2}
+        dragElastic={0.18}
         onDrag={(e, info) => setDragY(info.offset.y)}
         onDragEnd={handleDragEnd}
         style={{
           y: dragY,
-          opacity: Math.max(0.3, 1 - Math.abs(dragY) / 400),
+          opacity: Math.max(0.25, 1 - Math.abs(dragY) / 420),
         }}
-        transition={{ type: 'spring', stiffness: 280, damping: 30 }}
+        transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 0.9 }}
         className="flex flex-1 items-center justify-center px-4 touch-pan-y"
       >
         {isVideo ? (

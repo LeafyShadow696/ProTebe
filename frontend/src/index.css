@@ -10,19 +10,27 @@
   --rose: #E8B9C1;
   --rose-deep: #2F1A23;
   --border: rgba(255, 255, 255, 0.07);
-  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-bg: rgba(255, 255, 255, 0.055);
   --glass-border: rgba(255, 255, 255, 0.09);
+
+  /* Pleasant animation tokens - smooth, not rushed */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
+  --transition-fast: 0.22s var(--ease-out);
+  --transition-base: 0.32s var(--ease-out);
+  --transition-slow: 0.48s var(--ease-in-out);
+
   color-scheme: dark light;
 }
 
 [data-theme='light'] {
-  --bg: #FCFBFA;
-  --bg-soft: #F2E8E4;
-  --ink: #1C1917;
-  --ink-soft: #78716C;
-  --rose: #D1929E;
-  --rose-deep: #C77A8A;
-  --border: rgba(0, 0, 0, 0.08);
+  --bg: #F5F0EB;           /* softer, warmer, more pleasant */
+  --bg-soft: #EDE5DF;
+  --ink: #1F1C1A;
+  --ink-soft: #6B665F;
+  --rose: #C77A8A;
+  --rose-deep: #A35F6D;
+  --border: rgba(0, 0, 0, 0.07);
 }
 
 html,
@@ -34,6 +42,13 @@ body,
   padding: 0;
   background: var(--bg);
   color: var(--ink);
+}
+
+/* Pleasant light mode background with soft gradient */
+[data-theme='light'] html,
+[data-theme='light'] body,
+[data-theme='light'] #root {
+  background: linear-gradient(to bottom, #F7F2ED 0%, #F5F0EB 100%);
 }
 
 body {
@@ -156,36 +171,38 @@ textarea {
   filter: blur(90px);
   opacity: 0.6;
   will-change: transform, opacity;
-  transition: background 1.2s ease, opacity 1.2s ease;
+  transition: background var(--transition-slow), opacity var(--transition-slow);
 }
 
 .ambient-bg::before {
-  width: 75vw;
-  height: 75vw;
-  left: -15vw;
-  top: -15vw;
-  background: radial-gradient(circle at 35% 30%, #3A1C28 0%, rgba(58, 28, 40, 0) 72%);
-  animation: float-a 16s ease-in-out infinite alternate;
+  width: 78vw;
+  height: 78vw;
+  left: -18vw;
+  top: -18vw;
+  background: radial-gradient(circle at 32% 28%, #3A1C28 0%, rgba(58, 28, 40, 0) 78%);
+  animation: float-a 18s ease-in-out infinite alternate;
+  opacity: 0.55;
 }
 
 .ambient-bg::after {
-  width: 85vw;
-  height: 85vw;
-  right: -22vw;
-  bottom: -18vw;
-  background: radial-gradient(circle at 68% 72%, #1A1A2E 0%, rgba(26, 26, 46, 0) 72%);
-  animation: float-b 22s ease-in-out infinite alternate;
+  width: 88vw;
+  height: 88vw;
+  right: -24vw;
+  bottom: -22vw;
+  background: radial-gradient(circle at 72% 68%, #1F1F2E 0%, rgba(31, 31, 46, 0) 78%);
+  animation: float-b 26s ease-in-out infinite alternate;
+  opacity: 0.5;
 }
 
-/* Time-of-day mood overrides (applied via inline styles or data attributes) */
-[data-mood="morning"] .ambient-bg::before { background: radial-gradient(circle at 35% 30%, #5C3A2E 0%, rgba(92, 58, 46, 0) 72%); }
-[data-mood="morning"] .ambient-bg::after  { background: radial-gradient(circle at 68% 72%, #3A2A4A 0%, rgba(58, 42, 74, 0) 72%); }
+/* Time-of-day mood overrides — softer, more elegant gradients */
+[data-mood="morning"] .ambient-bg::before { background: radial-gradient(circle at 32% 28%, #5F4638 0%, rgba(95, 70, 56, 0) 78%); opacity: 0.5; }
+[data-mood="morning"] .ambient-bg::after  { background: radial-gradient(circle at 70% 70%, #463A55 0%, rgba(70, 58, 85, 0) 78%); opacity: 0.45; }
 
-[data-mood="day"] .ambient-bg::before { background: radial-gradient(circle at 35% 30%, #4A2A3A 0%, rgba(74, 42, 58, 0) 72%); }
-[data-mood="day"] .ambient-bg::after  { background: radial-gradient(circle at 68% 72%, #2A2A4A 0%, rgba(42, 42, 74, 0) 72%); }
+[data-mood="day"] .ambient-bg::before { background: radial-gradient(circle at 32% 28%, #4D3A42 0%, rgba(77, 58, 66, 0) 78%); opacity: 0.48; }
+[data-mood="day"] .ambient-bg::after  { background: radial-gradient(circle at 70% 70%, #3A3A52 0%, rgba(58, 58, 82, 0) 78%); opacity: 0.42; }
 
-[data-mood="evening"] .ambient-bg::before { background: radial-gradient(circle at 35% 30%, #5C2A2A 0%, rgba(92, 42, 42, 0) 72%); }
-[data-mood="evening"] .ambient-bg::after  { background: radial-gradient(circle at 68% 72%, #3A2A3A 0%, rgba(58, 42, 58, 0) 72%); }
+[data-mood="evening"] .ambient-bg::before { background: radial-gradient(circle at 32% 28%, #5C3636 0%, rgba(92, 54, 54, 0) 78%); opacity: 0.52; }
+[data-mood="evening"] .ambient-bg::after  { background: radial-gradient(circle at 70% 70%, #3F2E3F 0%, rgba(63, 46, 63, 0) 78%); opacity: 0.48; }
 
 [data-mood="night"] .ambient-bg::before { background: radial-gradient(circle at 35% 30%, #1A1628 0%, rgba(26, 22, 40, 0) 72%); }
 [data-mood="night"] .ambient-bg::after  { background: radial-gradient(circle at 68% 72%, #0F0F1A 0%, rgba(15, 15, 26, 0) 72%); }
@@ -221,16 +238,16 @@ textarea {
 
 /* Enhanced Glassmorphism — more depth, better material feel */
 .glass {
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--glass-bg);
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
   border: 1px solid var(--border);
   box-shadow: 
     0 4px 30px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), 
-              box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
-              border-color 0.2s ease;
+  transition: transform var(--transition-base), 
+              box-shadow var(--transition-base),
+              border-color var(--transition-fast);
 }
 
 .glass:hover {
@@ -241,14 +258,15 @@ textarea {
 }
 
 .glass-strong {
-  background: rgba(18, 16, 20, 0.62);
+  background: rgba(20, 18, 23, 0.65);
   backdrop-filter: blur(48px) saturate(220%);
   -webkit-backdrop-filter: blur(48px) saturate(220%);
   border: 1px solid var(--border);
   box-shadow: 
-    0 10px 40px rgba(0, 0, 0, 0.18),
+    0 12px 45px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
 }
 
 [data-theme='light'] .glass {
@@ -265,21 +283,20 @@ textarea {
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
-/* Premium material tap & focus feedback */
+/* Premium material tap & focus feedback — smooth, not rushed */
 .tap {
-  transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1), 
-              box-shadow 0.2s cubic-bezier(0.23, 1, 0.32, 1),
-              opacity 0.18s ease;
-  will-change: transform;
+  transition: transform var(--transition-fast), 
+              box-shadow var(--transition-fast),
+              opacity var(--transition-fast);
 }
 
 .tap:active {
-  transform: scale(0.965);
-  opacity: 0.92;
+  transform: scale(0.968);
+  opacity: 0.94;
 }
 
 .tap:hover {
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 /* Elegant focus rings */
@@ -326,7 +343,7 @@ input[type='file'].hidden-file {
 
 /* Bottom tab bar — hidden while a sheet/modal is open */
 .bottom-tab-bar-wrap {
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  transition: opacity var(--transition-base), transform var(--transition-base);
 }
 body.sheet-open .bottom-tab-bar-wrap {
   opacity: 0;
