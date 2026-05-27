@@ -2,7 +2,8 @@ fastapi==0.115.0
 uvicorn[standard]==0.32.0
 motor==3.6.0
 pymongo==4.9.1
-pydantic==2.8.2
+pydantic==2.7.4
+pydantic-core==2.18.4
 python-dotenv==1.0.1
 # emergentintegrations  # proprietary, optional for AI features (falls back if missing)
 python-multipart==0.0.12
