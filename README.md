@@ -15,7 +15,7 @@ bun run dev
 
 ```sh
 bun run test:unit
-bunx tsgo --noEmit
+bunx tsc --noEmit
 bun run lint
 bun run build
 bun run test:e2e
@@ -25,4 +25,4 @@ bun run test:e2e
 
 Runtime credentials a environment variables nepatří do Git repozitáře. Nastavují se v lokálním `.env` nebo v secrets cílového prostředí.
 
-Projekt byl původně rozvíjen v Lovable; `main` je propojená vývojová větev.
+Projekt byl původně rozvíjen v Lovable; GitHub `main` je nyní hlavní vývojová větev.
