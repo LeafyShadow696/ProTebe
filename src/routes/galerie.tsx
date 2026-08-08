@@ -156,15 +156,28 @@ function GalleryPage() {
       {active ? (
         <div className="anim-fade fixed inset-0 z-40 flex flex-col bg-background/92 backdrop-blur-xl">
           <div className="flex items-center justify-between px-5 pt-safe">
-            <button onClick={() => setActive(null)} aria-label="Zavřít" className="tap rounded-full p-2">
+            <button
+              onClick={() => setActive(null)}
+              aria-label="Zavřít"
+              className="tap rounded-full p-2"
+            >
               <X size={20} className="text-foreground" />
             </button>
-            <button onClick={() => remove.mutate(active.id)} aria-label="Smazat fotku" className="tap rounded-full p-2">
+            <button
+              onClick={() => remove.mutate(active.id)}
+              aria-label="Smazat fotku"
+              className="tap rounded-full p-2"
+            >
               <Trash2 size={18} className="text-muted-foreground" />
             </button>
           </div>
           <div className="anim-pop flex flex-1 items-center justify-center px-4 pb-10">
-            <SmartImage eager src={active.url} alt={active.caption ?? "Naše vzpomínka"} className="max-h-full w-full rounded-3xl object-contain" />
+            <SmartImage
+              eager
+              src={active.url}
+              alt={active.caption ?? "Naše vzpomínka"}
+              className="max-h-full w-full rounded-3xl object-contain"
+            />
           </div>
           <p className="pb-10 text-center text-xs text-muted-foreground">
             {formatCzechDateTime(active.created_at)}

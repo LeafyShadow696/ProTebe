@@ -2,13 +2,13 @@
 
 ## Rychlý přehled
 
-| Příkaz | Co spustí |
-| --- | --- |
-| `bun run test` | unit testy (alias pro `test:unit`) |
-| `bun run test:unit` | Vitest — čistá logika (`tests/unit`) |
-| `bun run test:unit:watch` | Vitest ve watch módu |
-| `bun run test:e2e` | Playwright smoke testy (`tests/e2e`) |
-| `bun run test:ci` | unit testy + typecheck + lint + production build |
+| Příkaz                    | Co spustí                                        |
+| ------------------------- | ------------------------------------------------ |
+| `bun run test`            | unit testy (alias pro `test:unit`)               |
+| `bun run test:unit`       | Vitest — čistá logika (`tests/unit`)             |
+| `bun run test:unit:watch` | Vitest ve watch módu                             |
+| `bun run test:e2e`        | Playwright smoke testy (`tests/e2e`)             |
+| `bun run test:ci`         | unit testy + typecheck + lint + production build |
 
 ## Unit testy (Vitest)
 

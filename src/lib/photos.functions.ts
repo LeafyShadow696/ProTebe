@@ -20,7 +20,10 @@ export const listPhotos = createServerFn({ method: "POST" }).handler(
       if (!rows || rows.length === 0) return [];
       const { data: signed, error: signError } = await supabase.storage
         .from("memories")
-        .createSignedUrls(rows.map((row) => row.storage_path), 60 * 60 * 6);
+        .createSignedUrls(
+          rows.map((row) => row.storage_path),
+          60 * 60 * 6,
+        );
       if (signError) throw dbFailure("photos#2", signError);
       return rows.map((row, index) => ({
         id: row.id,

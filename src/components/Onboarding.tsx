@@ -129,10 +129,22 @@ export function Onboarding({ onReady }: { onReady: (pair: PublicPair) => void })
         ) : mode === "create" ? (
           <div key="create" className="anim-fade-up">
             <GlassCard strong className="space-y-4 p-5">
-              <Field label="Já jsem" value={ownerName} onChange={setOwnerName} placeholder="Tvé jméno" />
-              <Field label="A ona je" value={partnerName} onChange={setPartnerName} placeholder="Její jméno" />
+              <Field
+                label="Já jsem"
+                value={ownerName}
+                onChange={setOwnerName}
+                placeholder="Tvé jméno"
+              />
+              <Field
+                label="A ona je"
+                value={partnerName}
+                onChange={setPartnerName}
+                placeholder="Její jméno"
+              />
               <label className="block">
-                <span className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground">Náš den</span>
+                <span className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground">
+                  Náš den
+                </span>
                 <input
                   type="date"
                   value={anniversary}
@@ -140,7 +152,9 @@ export function Onboarding({ onReady }: { onReady: (pair: PublicPair) => void })
                   className="mt-2 w-full rounded-2xl border border-input bg-secondary/50 px-4 py-3 text-foreground outline-none focus:border-ring"
                 />
               </label>
-              <PrimaryButton loading={loading} onClick={handleCreate}>Založit náš prostor</PrimaryButton>
+              <PrimaryButton loading={loading} onClick={handleCreate}>
+                Založit náš prostor
+              </PrimaryButton>
               <BackButton onClick={() => setMode(null)} />
             </GlassCard>
           </div>
@@ -148,7 +162,9 @@ export function Onboarding({ onReady }: { onReady: (pair: PublicPair) => void })
           <div key="join" className="anim-fade-up">
             <GlassCard strong className="space-y-4 p-5">
               <label className="block">
-                <span className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground">Kód pro připojení</span>
+                <span className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground">
+                  Kód pro připojení
+                </span>
                 <div className="mt-2 flex items-center gap-3 rounded-2xl border border-input bg-secondary/50 px-4 py-3">
                   <KeyRound size={16} className="text-primary" />
                   <input
@@ -160,8 +176,15 @@ export function Onboarding({ onReady }: { onReady: (pair: PublicPair) => void })
                   />
                 </div>
               </label>
-              <Field label="Jmenuji se" value={joinName} onChange={setJoinName} placeholder="Tvé jméno" />
-              <PrimaryButton loading={loading} onClick={handleJoin}>Vstoupit</PrimaryButton>
+              <Field
+                label="Jmenuji se"
+                value={joinName}
+                onChange={setJoinName}
+                placeholder="Tvé jméno"
+              />
+              <PrimaryButton loading={loading} onClick={handleJoin}>
+                Vstoupit
+              </PrimaryButton>
               <BackButton onClick={() => setMode(null)} />
             </GlassCard>
           </div>
@@ -171,11 +194,26 @@ export function Onboarding({ onReady }: { onReady: (pair: PublicPair) => void })
   );
 }
 
-function ChoiceButton({ icon, title, hint, onClick }: { icon: React.ReactNode; title: string; hint: string; onClick: () => void }) {
+function ChoiceButton({
+  icon,
+  title,
+  hint,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+  onClick: () => void;
+}) {
   return (
-    <button onClick={onClick} className="glass-strong tap flex w-full items-center justify-between rounded-3xl px-5 py-4 text-left">
+    <button
+      onClick={onClick}
+      className="glass-strong tap flex w-full items-center justify-between rounded-3xl px-5 py-4 text-left"
+    >
       <span className="flex items-center gap-4">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12">{icon}</span>
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12">
+          {icon}
+        </span>
         <span>
           <span className="block text-[15px] text-foreground">{title}</span>
           <span className="block text-xs text-muted-foreground">{hint}</span>
@@ -186,18 +224,48 @@ function ChoiceButton({ icon, title, hint, onClick }: { icon: React.ReactNode; t
   );
 }
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
   return (
     <label className="block">
       <span className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground">{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} maxLength={40} className="mt-2 w-full rounded-2xl border border-input bg-secondary/50 px-4 py-3 text-foreground outline-none placeholder:text-muted-foreground focus:border-ring" />
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        maxLength={40}
+        className="mt-2 w-full rounded-2xl border border-input bg-secondary/50 px-4 py-3 text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
+      />
     </label>
   );
 }
 
-export function PrimaryButton({ children, loading, onClick, disabled }: { children: React.ReactNode; loading?: boolean; onClick: () => void; disabled?: boolean }) {
+export function PrimaryButton({
+  children,
+  loading,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  loading?: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <button onClick={onClick} disabled={loading || disabled} className="tap flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3.5 text-[15px] font-medium text-primary-foreground shadow-bloom disabled:opacity-60">
+    <button
+      onClick={onClick}
+      disabled={loading || disabled}
+      className="tap flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3.5 text-[15px] font-medium text-primary-foreground shadow-bloom disabled:opacity-60"
+    >
       {loading ? <Loader2 size={16} className="animate-spin" /> : null}
       {children}
     </button>
@@ -205,5 +273,12 @@ export function PrimaryButton({ children, loading, onClick, disabled }: { childr
 }
 
 function BackButton({ onClick }: { onClick: () => void }) {
-  return <button onClick={onClick} className="w-full py-1 text-center text-xs tracking-[0.18em] uppercase text-muted-foreground">Zpět</button>;
+  return (
+    <button
+      onClick={onClick}
+      className="w-full py-1 text-center text-xs tracking-[0.18em] uppercase text-muted-foreground"
+    >
+      Zpět
+    </button>
+  );
 }

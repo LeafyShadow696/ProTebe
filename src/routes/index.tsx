@@ -2,7 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarHeart, Image as ImageIcon, MessageCircleHeart, Settings2, Wifi } from "lucide-react";
+import {
+  CalendarHeart,
+  Image as ImageIcon,
+  MessageCircleHeart,
+  Settings2,
+  Wifi,
+} from "lucide-react";
 
 import { GlassCard, PageHeader } from "@/components/GlassCard";
 import { CardSkeleton, Shimmer, SmartImage } from "@/components/Skeletons";
@@ -91,9 +97,24 @@ function Dashboard() {
   const eventsFn = useServerFn(listEvents);
   const liveInterval = useLiveInterval();
   const { partnerOnline } = useSync();
-  const messages = useQuery({ queryKey: ["messages", pair.id], queryFn: () => messagesFn(), refetchInterval: liveInterval, staleTime: 5_000 });
-  const photos = useQuery({ queryKey: ["photos", pair.id], queryFn: () => photosFn(), refetchInterval: liveInterval, staleTime: 10_000 });
-  const events = useQuery({ queryKey: ["events", pair.id], queryFn: () => eventsFn(), refetchInterval: liveInterval, staleTime: 10_000 });
+  const messages = useQuery({
+    queryKey: ["messages", pair.id],
+    queryFn: () => messagesFn(),
+    refetchInterval: liveInterval,
+    staleTime: 5_000,
+  });
+  const photos = useQuery({
+    queryKey: ["photos", pair.id],
+    queryFn: () => photosFn(),
+    refetchInterval: liveInterval,
+    staleTime: 10_000,
+  });
+  const events = useQuery({
+    queryKey: ["events", pair.id],
+    queryFn: () => eventsFn(),
+    refetchInterval: liveInterval,
+    staleTime: 10_000,
+  });
   const latest = messages.data?.find((message) => !message.sealed) ?? null;
   const today = new Date().toISOString().slice(0, 10);
   const nextEvent = events.data?.find((event) => event.starts_on >= today) ?? null;
@@ -102,16 +123,34 @@ function Dashboard() {
     <div className="space-y-5 pb-4">
       <PageHeader
         eyebrow={timeOfDayGreeting(now)}
-        title={<>Ahoj,<br />{toVocativeCz(names.you)}</>}
-        subtitle={partnerOnline ? <span className="inline-flex items-center gap-1.5 text-primary"><Wifi size={13} /> {names.you} je právě s tebou v aplikaci</span> : `Náš den je ${formatCzechDate(pair.anniversary)}.`}
+        title={
+          <>
+            Ahoj,
+            <br />
+            {toVocativeCz(names.you)}
+          </>
+        }
+        subtitle={
+          partnerOnline ? (
+            <span className="inline-flex items-center gap-1.5 text-primary">
+              <Wifi size={13} /> {names.you} je právě s tebou v aplikaci
+            </span>
+          ) : (
+            `Náš den je ${formatCzechDate(pair.anniversary)}.`
+          )
+        }
       />
 
-      <section className="px-6"><LoveCounter anniversary={pair.anniversary} /></section>
+      <section className="px-6">
+        <LoveCounter anniversary={pair.anniversary} />
+      </section>
 
       {!pair.has_partner && pair.role === "owner" ? (
         <section className="px-6">
           <GlassCard className="p-5">
-            <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Pozvi ji k nám</p>
+            <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+              Pozvi ji k nám
+            </p>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               Vytvoř jednorázový kód pro připojení. Platí 24 hodin a použít ho lze jen jednou.
             </p>
@@ -128,14 +167,30 @@ function Dashboard() {
       ) : null}
 
       <section className="space-y-3 px-6">
-        {events.isLoading ? <CardSkeleton lines={1} /> : nextEvent ? (
+        {events.isLoading ? (
+          <CardSkeleton lines={1} />
+        ) : nextEvent ? (
           <Link to="/kalendar" preload="intent" className="block">
             <GlassCard className="flex items-center gap-4 p-5">
               <div className="flex h-14 w-14 flex-none flex-col items-center justify-center rounded-2xl bg-primary/12">
-                <span className="font-display text-xl leading-none text-foreground">{Number(nextEvent.starts_on.slice(8, 10))}</span>
-                <span className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground">{formatCzechDate(nextEvent.starts_on).split(" ")[1]?.slice(0, 3)}</span>
+                <span className="font-display text-xl leading-none text-foreground">
+                  {Number(nextEvent.starts_on.slice(8, 10))}
+                </span>
+                <span className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {formatCzechDate(nextEvent.starts_on).split(" ")[1]?.slice(0, 3)}
+                </span>
               </div>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Před námi</p><p className="mt-1 truncate font-display text-xl font-light text-foreground">{nextEvent.title}</p>{nextEvent.starts_at ? <p className="text-xs text-muted-foreground">{nextEvent.starts_at}</p> : null}</div>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+                  Před námi
+                </p>
+                <p className="mt-1 truncate font-display text-xl font-light text-foreground">
+                  {nextEvent.title}
+                </p>
+                {nextEvent.starts_at ? (
+                  <p className="text-xs text-muted-foreground">{nextEvent.starts_at}</p>
+                ) : null}
+              </div>
               <CalendarHeart size={16} className="ml-auto flex-none text-primary" />
             </GlassCard>
           </Link>
@@ -143,15 +198,46 @@ function Dashboard() {
 
         <Link to="/vzkazy" preload="intent" className="block">
           <GlassCard className="p-5">
-            <div className="flex items-center justify-between"><p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Poslední vzkaz</p><MessageCircleHeart size={16} className="text-primary" /></div>
-            {messages.isLoading ? <Shimmer className="mt-3 h-6 w-3/4" /> : <p className="mt-3 line-clamp-3 font-display text-xl font-light leading-snug text-foreground">{latest?.body ?? "Ještě tu není žádné slovo. Napiš první."}</p>}
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+                Poslední vzkaz
+              </p>
+              <MessageCircleHeart size={16} className="text-primary" />
+            </div>
+            {messages.isLoading ? (
+              <Shimmer className="mt-3 h-6 w-3/4" />
+            ) : (
+              <p className="mt-3 line-clamp-3 font-display text-xl font-light leading-snug text-foreground">
+                {latest?.body ?? "Ještě tu není žádné slovo. Napiš první."}
+              </p>
+            )}
           </GlassCard>
         </Link>
 
         <Link to="/galerie" preload="intent" className="block">
           <GlassCard className="p-5">
-            <div className="flex items-center justify-between"><p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Naše vzpomínky</p><ImageIcon size={16} className="text-primary" /></div>
-            {photos.data && photos.data.length > 0 ? <div className="mt-3 flex gap-2 overflow-hidden">{photos.data.slice(0, 4).map((photo) => <SmartImage key={photo.id} src={photo.url} alt={photo.caption ?? "Naše vzpomínka"} className="h-20 w-20 flex-none rounded-2xl object-cover" />)}</div> : <p className="mt-3 text-sm text-muted-foreground">Zatím prázdno. Přidej první fotku.</p>}
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+                Naše vzpomínky
+              </p>
+              <ImageIcon size={16} className="text-primary" />
+            </div>
+            {photos.data && photos.data.length > 0 ? (
+              <div className="mt-3 flex gap-2 overflow-hidden">
+                {photos.data.slice(0, 4).map((photo) => (
+                  <SmartImage
+                    key={photo.id}
+                    src={photo.url}
+                    alt={photo.caption ?? "Naše vzpomínka"}
+                    className="h-20 w-20 flex-none rounded-2xl object-cover"
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Zatím prázdno. Přidej první fotku.
+              </p>
+            )}
           </GlassCard>
         </Link>
       </section>

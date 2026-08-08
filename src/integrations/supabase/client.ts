@@ -12,7 +12,10 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
       typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined,
     );
     if (init?.headers) new Headers(init.headers).forEach((value, key) => headers.set(key, value));
-    if (isNewSupabaseApiKey(supabaseKey) && headers.get("Authorization") === `Bearer ${supabaseKey}`) {
+    if (
+      isNewSupabaseApiKey(supabaseKey) &&
+      headers.get("Authorization") === `Bearer ${supabaseKey}`
+    ) {
       headers.delete("Authorization");
     }
     headers.set("apikey", supabaseKey);
@@ -22,16 +25,24 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 function createSupabaseClient() {
   const SUPABASE_URL = import.meta.env["VITE_SUPABASE_URL"] || process.env["SUPABASE_URL"];
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
+  const SUPABASE_PUBLISHABLE_KEY =
+    import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    const missing = [...(!SUPABASE_URL ? ["SUPABASE_URL"] : []), ...(!SUPABASE_PUBLISHABLE_KEY ? ["SUPABASE_PUBLISHABLE_KEY"] : [])];
+    const missing = [
+      ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
+      ...(!SUPABASE_PUBLISHABLE_KEY ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
+    ];
     const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: { fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY) },
-    auth: { storage: typeof window !== "undefined" ? localStorage : undefined, persistSession: true, autoRefreshToken: true },
+    auth: {
+      storage: typeof window !== "undefined" ? localStorage : undefined,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
   });
 }
 

@@ -102,7 +102,8 @@ export async function findRedeemableInvite(input: {
   const invite = data as unknown as InviteRow;
   if (invite.target_role !== INVITE_TARGET_ROLE) throw new Error(INVITE_INVALID_MESSAGE);
   if (invite.revoked_at || invite.consumed_at) throw new Error(INVITE_INVALID_MESSAGE);
-  if (!(new Date(invite.expires_at).getTime() > now.getTime())) throw new Error(INVITE_INVALID_MESSAGE);
+  if (!(new Date(invite.expires_at).getTime() > now.getTime()))
+    throw new Error(INVITE_INVALID_MESSAGE);
   if (input.secret) {
     const ok = await verifyInviteLinkSecret(input.secret, invite.link_secret_digest);
     if (!ok) throw new Error(INVITE_INVALID_MESSAGE);

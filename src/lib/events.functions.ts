@@ -52,7 +52,11 @@ const CreateInput = z.object({
   title: z.string().trim().min(1).max(120),
   note: z.string().trim().max(600).nullable().optional(),
   starts_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  starts_at: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  starts_at: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .nullable()
+    .optional(),
   kind: z.enum(EVENT_KINDS).optional(),
 });
 

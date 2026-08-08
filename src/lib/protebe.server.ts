@@ -40,7 +40,11 @@ export async function findPairByToken(token: string): Promise<PairSession | null
   const byOwner = await supabase.from("pairs").select("*").eq("owner_token", token).maybeSingle();
   if (byOwner.error) throw dbFailure("findPairByToken/owner", byOwner.error);
   if (byOwner.data) return { pair: byOwner.data as PairRow, role: "owner" };
-  const byPartner = await supabase.from("pairs").select("*").eq("partner_token", token).maybeSingle();
+  const byPartner = await supabase
+    .from("pairs")
+    .select("*")
+    .eq("partner_token", token)
+    .maybeSingle();
   if (byPartner.error) throw dbFailure("findPairByToken/partner", byPartner.error);
   if (byPartner.data) return { pair: byPartner.data as PairRow, role: "partner" };
   return null;
@@ -51,5 +55,13 @@ export async function resolvePair(token: string): Promise<PairSession> {
   return session;
 }
 export function toPublicPair(pair: PairRow, role: PairRole): PublicPair {
-  return { id: pair.id, code: pair.code, owner_name: pair.owner_name, partner_name: pair.partner_name, anniversary: pair.anniversary, has_partner: Boolean(pair.partner_token), role };
+  return {
+    id: pair.id,
+    code: pair.code,
+    owner_name: pair.owner_name,
+    partner_name: pair.partner_name,
+    anniversary: pair.anniversary,
+    has_partner: Boolean(pair.partner_token),
+    role,
+  };
 }

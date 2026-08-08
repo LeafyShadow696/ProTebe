@@ -16,7 +16,9 @@ export async function startSyncEngine(options: {
   });
   const readPresence = () => {
     const state = channel.presenceState<{ role: string; client: string }>();
-    const others = Object.values(state).flat().filter((entry) => entry.client !== clientId);
+    const others = Object.values(state)
+      .flat()
+      .filter((entry) => entry.client !== clientId);
     options.onPartnerOnline(others.length > 0);
   };
   channel
@@ -36,7 +38,11 @@ export async function startSyncEngine(options: {
       }
     });
   return {
-    notify: (scope) => { void channel.send({ type: "broadcast", event: "changed", payload: { scope } }); },
-    stop: () => { void supabase.removeChannel(channel); },
+    notify: (scope) => {
+      void channel.send({ type: "broadcast", event: "changed", payload: { scope } });
+    },
+    stop: () => {
+      void supabase.removeChannel(channel);
+    },
   };
 }

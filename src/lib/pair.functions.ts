@@ -148,7 +148,10 @@ export const getPair = createServerFn({ method: "POST" }).handler(async () =>
 const UpdateInput = z.object({
   owner_name: z.string().trim().min(1).max(40).optional(),
   partner_name: z.string().trim().min(1).max(40).optional(),
-  anniversary: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  anniversary: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 export const updatePair = createServerFn({ method: "POST" })

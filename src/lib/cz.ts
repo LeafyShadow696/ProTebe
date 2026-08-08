@@ -1,8 +1,79 @@
-const CZ_MONTHS = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
-export function formatCzechDate(yyyyMmDd: string): string { const [y,m,d]=(yyyyMmDd||"").split("-").map(Number); if(!y||!m||!d)return yyyyMmDd; return `${d}. ${CZ_MONTHS[m-1]??""} ${y}`; }
-export function formatCzechDateTime(iso:string):string { const date=new Date(iso); const time=date.toLocaleTimeString("cs-CZ",{hour:"2-digit",minute:"2-digit"}); return `${date.getDate()}. ${CZ_MONTHS[date.getMonth()]??""} ${date.getFullYear()} · ${time}`; }
-export type LoveDuration={future:boolean;days:number;hours:number;minutes:number;seconds:number;years:number;months:number};
-export function loveDuration(anniversary:string,now:Date=new Date()):LoveDuration { const [y=1970,m=1,d=1]=anniversary.split("-").map(Number); const start=new Date(Date.UTC(y,m-1,d)); const diff=now.getTime()-start.getTime(); const future=diff<0; const abs=Math.abs(diff); let years=now.getUTCFullYear()-start.getUTCFullYear(); let months=now.getUTCMonth()-start.getUTCMonth(); if(months<0){months+=12;years-=1;} if(years<0){years=0;months=0;} return {future,days:Math.floor(abs/86_400_000),hours:Math.floor((abs/3_600_000)%24),minutes:Math.floor((abs/60_000)%60),seconds:Math.floor((abs/1000)%60),years,months}; }
-export function czDays(n:number):string { if(n===1)return "1 den"; if(n>=2&&n<=4)return `${n} dny`; return `${n} dní`; }
-export function toVocativeCz(name:string):string { const trimmed=(name||"").trim(); if(!trimmed)return ""; const last=trimmed.slice(-1).toLowerCase(); if(last==="a")return `${trimmed.slice(0,-1)}o`; return trimmed; }
-export function timeOfDayGreeting(now:Date=new Date()):string { const h=now.getHours(); if(h<5)return "Něžná noc"; if(h<11)return "Tiché ráno"; if(h<17)return "Den s tebou"; if(h<22)return "Zlatý večer"; return "Tichá noc"; }
+const CZ_MONTHS = [
+  "ledna",
+  "února",
+  "března",
+  "dubna",
+  "května",
+  "června",
+  "července",
+  "srpna",
+  "září",
+  "října",
+  "listopadu",
+  "prosince",
+];
+export function formatCzechDate(yyyyMmDd: string): string {
+  const [y, m, d] = (yyyyMmDd || "").split("-").map(Number);
+  if (!y || !m || !d) return yyyyMmDd;
+  return `${d}. ${CZ_MONTHS[m - 1] ?? ""} ${y}`;
+}
+export function formatCzechDateTime(iso: string): string {
+  const date = new Date(iso);
+  const time = date.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
+  return `${date.getDate()}. ${CZ_MONTHS[date.getMonth()] ?? ""} ${date.getFullYear()} · ${time}`;
+}
+export type LoveDuration = {
+  future: boolean;
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  years: number;
+  months: number;
+};
+export function loveDuration(anniversary: string, now: Date = new Date()): LoveDuration {
+  const [y = 1970, m = 1, d = 1] = anniversary.split("-").map(Number);
+  const start = new Date(Date.UTC(y, m - 1, d));
+  const diff = now.getTime() - start.getTime();
+  const future = diff < 0;
+  const abs = Math.abs(diff);
+  let years = now.getUTCFullYear() - start.getUTCFullYear();
+  let months = now.getUTCMonth() - start.getUTCMonth();
+  if (months < 0) {
+    months += 12;
+    years -= 1;
+  }
+  if (years < 0) {
+    years = 0;
+    months = 0;
+  }
+  return {
+    future,
+    days: Math.floor(abs / 86_400_000),
+    hours: Math.floor((abs / 3_600_000) % 24),
+    minutes: Math.floor((abs / 60_000) % 60),
+    seconds: Math.floor((abs / 1000) % 60),
+    years,
+    months,
+  };
+}
+export function czDays(n: number): string {
+  if (n === 1) return "1 den";
+  if (n >= 2 && n <= 4) return `${n} dny`;
+  return `${n} dní`;
+}
+export function toVocativeCz(name: string): string {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return "";
+  const last = trimmed.slice(-1).toLowerCase();
+  if (last === "a") return `${trimmed.slice(0, -1)}o`;
+  return trimmed;
+}
+export function timeOfDayGreeting(now: Date = new Date()): string {
+  const h = now.getHours();
+  if (h < 5) return "Něžná noc";
+  if (h < 11) return "Tiché ráno";
+  if (h < 17) return "Den s tebou";
+  if (h < 22) return "Zlatý večer";
+  return "Tichá noc";
+}
