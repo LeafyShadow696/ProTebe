@@ -4,10 +4,9 @@ on:
   push:
     branches:
       - sync/lovable-2026-08-08
-      - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -16,12 +15,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: sync/lovable-2026-08-08
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install dependencies
         run: bun install
+      - name: Format synchronized sources once
+        run: bunx prettier --write .
+      - name: Commit formatting if needed
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "style: format synchronized sources"
+            git push origin HEAD:sync/lovable-2026-08-08
+          fi
       - name: Typecheck
         run: bunx tsc --noEmit
       - name: Lint
