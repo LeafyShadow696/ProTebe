@@ -14,7 +14,7 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:ci": "bun run test:unit && bunx tsgo --noEmit && bun run lint && bun run build"
+    "test:ci": "bun run test:unit && bunx tsc --noEmit && bun run lint && bun run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
