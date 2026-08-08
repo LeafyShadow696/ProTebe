@@ -14,7 +14,9 @@ import {
 } from "./helpers";
 
 test.describe("onboarding + core flows", () => {
-  test("creates a pair, keeps the session over a reload and shows the dashboard", async ({ page }) => {
+  test("creates a pair, keeps the session over a reload and shows the dashboard", async ({
+    page,
+  }) => {
     const errors = expectNoPageErrors(page);
     const pair = await createTestPair(page);
 
@@ -78,10 +80,14 @@ test.describe("onboarding + core flows", () => {
     await page.getByRole("button", { name: /Odhlásit toto zařízení/ }).click();
     await logout;
 
-    await expect(page.getByRole("button", { name: /Vytvořit náš prostor/ })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("button", { name: /Vytvořit náš prostor/ })).toBeVisible({
+      timeout: 20_000,
+    });
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("button", { name: /Vytvořit náš prostor/ })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("button", { name: /Vytvořit náš prostor/ })).toBeVisible({
+      timeout: 20_000,
+    });
     expect(await readSessionCookie(page)).toBeNull();
     expect(await readLegacyCompatCookie(page)).toBeNull();
   });

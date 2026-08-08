@@ -1,6 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { generateManualCode, generateRecoveryCode, normalizeManualCode } from "@/lib/auth-v2-format";
+import {
+  generateManualCode,
+  generateRecoveryCode,
+  normalizeManualCode,
+} from "@/lib/auth-v2-format";
 
 const TEST_PEPPER = "test-pepper-value-for-unit-tests-only";
 
@@ -23,7 +27,8 @@ describe("digests", () => {
   });
 
   it("are domain-separated per credential kind", async () => {
-    const { sessionSecretDigest, inviteLinkSecretDigest, recoveryCodeDigest } = await import("@/lib/auth-v2.server");
+    const { sessionSecretDigest, inviteLinkSecretDigest, recoveryCodeDigest } =
+      await import("@/lib/auth-v2.server");
     const secret = "same-input";
     const digests = new Set([
       await sessionSecretDigest(secret),
@@ -98,7 +103,8 @@ describe("manual code HMAC", () => {
   });
 
   it("fails closed without a pepper, while plain digests still work", async () => {
-    const { manualCodeHmac, sessionSecretDigest, hasAuthPepper } = await import("@/lib/auth-v2.server");
+    const { manualCodeHmac, sessionSecretDigest, hasAuthPepper } =
+      await import("@/lib/auth-v2.server");
     delete process.env["AUTH_V2_PEPPER"];
     expect(hasAuthPepper()).toBe(false);
     await expect(manualCodeHmac("ABCDEFGHJK")).rejects.toThrow(/AUTH_V2_PEPPER/);

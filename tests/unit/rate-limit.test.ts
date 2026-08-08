@@ -1,6 +1,11 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { RATE_LIMIT_MAX_WINDOW_SECONDS, evaluateRateLimit, rateLimitHit, rateLimitKeyMaterial } from "@/lib/rate-limit.server";
+import {
+  RATE_LIMIT_MAX_WINDOW_SECONDS,
+  evaluateRateLimit,
+  rateLimitHit,
+  rateLimitKeyMaterial,
+} from "@/lib/rate-limit.server";
 
 const rpc = vi.fn();
 vi.mock("@/integrations/supabase/client.server", () => ({
@@ -35,40 +40,61 @@ describe("evaluateRateLimit", () => {
   });
 
   it("rejects invalid windows", () => {
-    for (const w of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, RATE_LIMIT_MAX_WINDOW_SECONDS + 1]) {
+    for (const w of [
+      0,
+      -1,
+      1.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      RATE_LIMIT_MAX_WINDOW_SECONDS + 1,
+    ]) {
       expect(() => evaluateRateLimit(1, 3, w)).toThrow(/invalid window/);
     }
   });
 
   it("rejects invalid counts", () => {
-    for (const count of [-1, 1.5, Number.NaN]) expect(() => evaluateRateLimit(count, 3, 60)).toThrow(/invalid count/);
+    for (const count of [-1, 1.5, Number.NaN])
+      expect(() => evaluateRateLimit(count, 3, 60)).toThrow(/invalid count/);
   });
 });
 
 describe("rateLimitHit input validation", () => {
   it("rejects an empty or whitespace key before touching the database", async () => {
     for (const key of ["", "   ", "\n"]) {
-      await expect(rateLimitHit({ scope: "join", key, limit: 3, windowSeconds: 60 })).rejects.toThrow(/invalid key/);
+      await expect(
+        rateLimitHit({ scope: "join", key, limit: 3, windowSeconds: 60 }),
+      ).rejects.toThrow(/invalid key/);
     }
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it("rejects an unknown runtime scope", async () => {
     await expect(
-      rateLimitHit({ scope: "totally-unknown" as unknown as "join", key: "1.2.3.4", limit: 3, windowSeconds: 60 }),
+      rateLimitHit({
+        scope: "totally-unknown" as unknown as "join",
+        key: "1.2.3.4",
+        limit: 3,
+        windowSeconds: 60,
+      }),
     ).rejects.toThrow(/invalid scope/);
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it("rejects invalid limit/window before touching the database", async () => {
-    await expect(rateLimitHit({ scope: "join", key: "1.2.3.4", limit: 0, windowSeconds: 60 })).rejects.toThrow(/invalid limit/);
-    await expect(rateLimitHit({ scope: "join", key: "1.2.3.4", limit: 3, windowSeconds: 0 })).rejects.toThrow(/invalid window/);
+    await expect(
+      rateLimitHit({ scope: "join", key: "1.2.3.4", limit: 0, windowSeconds: 60 }),
+    ).rejects.toThrow(/invalid limit/);
+    await expect(
+      rateLimitHit({ scope: "join", key: "1.2.3.4", limit: 3, windowSeconds: 0 }),
+    ).rejects.toThrow(/invalid window/);
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it("never fails open: an RPC error propagates instead of allowing the request", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
-    await expect(rateLimitHit({ scope: "join", key: "1.2.3.4", limit: 3, windowSeconds: 60 })).rejects.toThrow(/rate limit unavailable/);
+    await expect(
+      rateLimitHit({ scope: "join", key: "1.2.3.4", limit: 3, windowSeconds: 60 }),
+    ).rejects.toThrow(/rate limit unavailable/);
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
@@ -77,7 +103,9 @@ describe("rateLimitHit input validation", () => {
       data: [{ allowed: true, current_count: 1, remaining: 2, retry_after_seconds: 0 }],
       error: null,
     });
-    await expect(rateLimitHit({ scope: "join", key: "1.2.3.4", limit: 3, windowSeconds: 60 })).resolves.toEqual({
+    await expect(
+      rateLimitHit({ scope: "join", key: "1.2.3.4", limit: 3, windowSeconds: 60 }),
+    ).resolves.toEqual({
       allowed: true,
       count: 1,
       remaining: 2,
@@ -88,7 +116,9 @@ describe("rateLimitHit input validation", () => {
 
 describe("rate limit bucket key", () => {
   it("is scoped so the same identifier cannot collide across scopes", () => {
-    expect(rateLimitKeyMaterial("join", "1.2.3.4")).not.toBe(rateLimitKeyMaterial("upload", "1.2.3.4"));
+    expect(rateLimitKeyMaterial("join", "1.2.3.4")).not.toBe(
+      rateLimitKeyMaterial("upload", "1.2.3.4"),
+    );
   });
 
   it("hashes the identifier so no raw value is ever stored", async () => {

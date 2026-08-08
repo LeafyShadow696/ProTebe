@@ -175,7 +175,8 @@ describe("auth-v2 zod schemas", () => {
   beforeAll(() => {});
 
   it("validates credentials and codes", async () => {
-    const { sessionCredentialSchema, manualInviteCodeSchema, recoveryCodeSchema } = await import("@/lib/auth-v2-schemas");
+    const { sessionCredentialSchema, manualInviteCodeSchema, recoveryCodeSchema } =
+      await import("@/lib/auth-v2-schemas");
     const credential = formatSessionCredential(UUID, generateSessionSecret());
     expect(sessionCredentialSchema.parse(credential)).toBe(credential);
     expect(() => sessionCredentialSchema.parse("nope")).toThrow();

@@ -30,7 +30,10 @@ test.describe("upload endpoint", () => {
     expect(result.text).not.toMatch(/service_role|postgres|policy|sb_secret/i);
   });
 
-  test("rejects requests with no session (and ignores x-pair-token) with 401", async ({ request, baseURL }) => {
+  test("rejects requests with no session (and ignores x-pair-token) with 401", async ({
+    request,
+    baseURL,
+  }) => {
     for (const token of MALFORMED_TOKENS) {
       const response = await request.post(`${baseURL}/api/public/upload`, {
         headers: { "content-type": "image/png", "x-pair-token": token },
@@ -58,13 +61,19 @@ test.describe("upload endpoint", () => {
 });
 
 test.describe("calendar feed", () => {
-  test("serves an .ics feed for the created pair and 404s on a bad key", async ({ page, request, baseURL }) => {
+  test("serves an .ics feed for the created pair and 404s on a bad key", async ({
+    page,
+    request,
+    baseURL,
+  }) => {
     await createTestPair(page);
 
     await page.getByRole("link", { name: "Kalendář" }).click();
     const feedLink = page.locator('a[download="pro-tebe.ics"]');
     await expect(feedLink).toBeVisible({ timeout: 20_000 });
-    await expect.poll(() => feedLink.getAttribute("href"), { timeout: 20_000 }).toContain("/api/public/calendar/");
+    await expect
+      .poll(() => feedLink.getAttribute("href"), { timeout: 20_000 })
+      .toContain("/api/public/calendar/");
     const href = (await feedLink.getAttribute("href"))!;
     const path = new URL(href, baseURL).pathname;
     expect(path).toMatch(/^\/api\/public\/calendar\/[0-9a-f-]{36}\.[0-9a-f]{32}\.ics$/);

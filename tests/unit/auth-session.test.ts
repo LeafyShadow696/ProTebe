@@ -40,7 +40,8 @@ function builder(table: Table) {
   let pendingInsert: Record<string, unknown> | null = null;
   let pendingPatch: Record<string, unknown> | null = null;
 
-  const match = () => rowsFor(table).filter((row) => filters.every(([key, value]) => row[key] === value));
+  const match = () =>
+    rowsFor(table).filter((row) => filters.every(([key, value]) => row[key] === value));
 
   const api: Record<string, unknown> = {
     select: () => api,
@@ -140,7 +141,10 @@ describe("resolveSessionCredential", () => {
   });
 
   it("rejects an unknown session id", async () => {
-    const credential = formatSessionCredential("33333333-3333-3333-3333-333333333333", generateSessionSecret());
+    const credential = formatSessionCredential(
+      "33333333-3333-3333-3333-333333333333",
+      generateSessionSecret(),
+    );
     expect(await resolveSessionCredential(credential, NOW)).toBeNull();
   });
 
@@ -155,16 +159,22 @@ describe("resolveSessionCredential", () => {
     expect(await resolveSessionCredential(revoked.credential, NOW)).toBeNull();
 
     state.sessions = [];
-    const idle = await seedSession({ idle_expires_at: new Date(NOW.getTime() - 1000).toISOString() });
+    const idle = await seedSession({
+      idle_expires_at: new Date(NOW.getTime() - 1000).toISOString(),
+    });
     expect(await resolveSessionCredential(idle.credential, NOW)).toBeNull();
 
     state.sessions = [];
-    const absolute = await seedSession({ absolute_expires_at: new Date(NOW.getTime() - 1000).toISOString() });
+    const absolute = await seedSession({
+      absolute_expires_at: new Date(NOW.getTime() - 1000).toISOString(),
+    });
     expect(await resolveSessionCredential(absolute.credential, NOW)).toBeNull();
   });
 
   it("does not write on every request (lazy last_seen touch)", async () => {
-    const { credential } = await seedSession({ last_seen_at: new Date(NOW.getTime() - 1000).toISOString() });
+    const { credential } = await seedSession({
+      last_seen_at: new Date(NOW.getTime() - 1000).toISOString(),
+    });
     await resolveSessionCredential(credential, NOW);
     expect(state.updates).toHaveLength(0);
   });
@@ -185,14 +195,21 @@ describe("resolveSessionCredential", () => {
 
 describe("createSessionRow", () => {
   it("stores only a digest and returns a credential that never leaks into PublicPair", async () => {
-    const issued = await createSessionRow({ pairId: PAIR.id, role: "owner", createdVia: "create", now: NOW });
+    const issued = await createSessionRow({
+      pairId: PAIR.id,
+      role: "owner",
+      createdVia: "create",
+      now: NOW,
+    });
 
     expect(issued.credential.startsWith("ps1.")).toBe(true);
     const row = state.inserted[0]!;
     expect(row["created_via"]).toBe("create");
     expect(row["role"]).toBe("owner");
     expect(row["pair_id"]).toBe(PAIR.id);
-    expect(row["absolute_expires_at"]).toBe(new Date(NOW.getTime() + 365 * 86_400_000).toISOString());
+    expect(row["absolute_expires_at"]).toBe(
+      new Date(NOW.getTime() + 365 * 86_400_000).toISOString(),
+    );
     expect(JSON.stringify(row)).not.toContain(issued.credential.split(".")[2]);
 
     const publicPair = toPublicPair(PAIR, "owner") as Record<string, unknown>;
@@ -204,13 +221,18 @@ describe("createSessionRow", () => {
 describe("revokeSessionRow", () => {
   it("marks exactly one session revoked", async () => {
     await revokeSessionRow("22222222-2222-2222-2222-222222222222", NOW);
-    expect(state.updates).toEqual([{ table: "pair_sessions", patch: { revoked_at: NOW.toISOString() } }]);
+    expect(state.updates).toEqual([
+      { table: "pair_sessions", patch: { revoked_at: NOW.toISOString() } },
+    ]);
   });
 });
 
 describe("cookie plumbing", () => {
   it("reads the session credential out of a raw Request cookie header", () => {
-    const credential = formatSessionCredential("44444444-4444-4444-4444-444444444444", generateSessionSecret());
+    const credential = formatSessionCredential(
+      "44444444-4444-4444-4444-444444444444",
+      generateSessionSecret(),
+    );
     const request = new Request("http://localhost/api/public/upload", {
       headers: { cookie: `other=1; ${SESSION_COOKIE}=${credential}; protebe_recovery=x` },
     });
@@ -233,7 +255,8 @@ describe("role defence in depth", () => {
   it("never maps an unexpected DB role onto owner", async () => {
     expect(parseRole("owner")).toBe("owner");
     expect(parseRole("partner")).toBe("partner");
-    for (const value of ["Owner", "admin", "", null, undefined, 1]) expect(parseRole(value)).toBeNull();
+    for (const value of ["Owner", "admin", "", null, undefined, 1])
+      expect(parseRole(value)).toBeNull();
 
     const { credential } = await seedSession({ role: "superuser" });
     expect(await resolveSessionCredential(credential, NOW)).toBeNull();
@@ -250,24 +273,39 @@ describe("legacy compatibility resolver", () => {
   });
 
   it("fails closed on malformed or unknown legacy values", async () => {
-    for (const value of [null, undefined, "", "nope", "A".repeat(48), "a".repeat(47), "b".repeat(48)]) {
+    for (const value of [
+      null,
+      undefined,
+      "",
+      "nope",
+      "A".repeat(48),
+      "a".repeat(47),
+      "b".repeat(48),
+    ]) {
       expect(await resolveLegacyCompatCredential(value as string | null)).toBeNull();
     }
   });
 });
 
 describe("request resolver precedence", () => {
-  const requestWith = (cookie: string) => new Request("http://localhost/api/public/upload", { headers: { cookie } });
+  const requestWith = (cookie: string) =>
+    new Request("http://localhost/api/public/upload", { headers: { cookie } });
 
   it("flag ON: a legacy compat cookie is not an authorisation fallback", async () => {
     process.env[UPGRADE_FLAG_ENV] = "true";
-    const session = await resolveRequestSession(requestWith(`${LEGACY_COMPAT_COOKIE}=${PAIR.owner_token}`), NOW);
+    const session = await resolveRequestSession(
+      requestWith(`${LEGACY_COMPAT_COOKIE}=${PAIR.owner_token}`),
+      NOW,
+    );
     expect(session).toBeNull();
   });
 
   it("flag OFF: a valid legacy compat cookie authorises with DB-derived role", async () => {
     process.env[UPGRADE_FLAG_ENV] = "false";
-    const session = await resolveRequestSession(requestWith(`${LEGACY_COMPAT_COOKIE}=${PAIR.owner_token}`), NOW);
+    const session = await resolveRequestSession(
+      requestWith(`${LEGACY_COMPAT_COOKIE}=${PAIR.owner_token}`),
+      NOW,
+    );
     expect(session?.pair.id).toBe(PAIR.id);
     expect(session?.role).toBe("owner");
     expect(session?.authMode).toBe("legacy");
@@ -291,8 +329,12 @@ describe("request resolver precedence", () => {
 
   it("switching the flag back ON makes the compat cookie alone insufficient", async () => {
     process.env[UPGRADE_FLAG_ENV] = "false";
-    expect(await resolveRequestSession(requestWith(`${LEGACY_COMPAT_COOKIE}=${PAIR.owner_token}`), NOW)).not.toBeNull();
+    expect(
+      await resolveRequestSession(requestWith(`${LEGACY_COMPAT_COOKIE}=${PAIR.owner_token}`), NOW),
+    ).not.toBeNull();
     delete process.env[UPGRADE_FLAG_ENV];
-    expect(await resolveRequestSession(requestWith(`${LEGACY_COMPAT_COOKIE}=${PAIR.owner_token}`), NOW)).toBeNull();
+    expect(
+      await resolveRequestSession(requestWith(`${LEGACY_COMPAT_COOKIE}=${PAIR.owner_token}`), NOW),
+    ).toBeNull();
   });
 });

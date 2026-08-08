@@ -66,7 +66,9 @@ describe("legacy transition decisions", () => {
     const pair = { owner_token: "a".repeat(48), partner_token: "b".repeat(48) };
     expect(legacyTokenForRole(pair, "owner")).toBe(pair.owner_token);
     expect(legacyTokenForRole(pair, "partner")).toBe(pair.partner_token);
-    expect(legacyTokenForRole({ owner_token: "a".repeat(48), partner_token: null }, "partner")).toBeNull();
+    expect(
+      legacyTokenForRole({ owner_token: "a".repeat(48), partner_token: null }, "partner"),
+    ).toBeNull();
     expect(legacyTokenForRole({ owner_token: "", partner_token: null }, "owner")).toBeNull();
   });
 });

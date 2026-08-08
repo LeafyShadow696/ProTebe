@@ -5,8 +5,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AUTH_PEPPER_ENV, manualCodeHmac } from "@/lib/auth-v2.server";
 import { generateInviteLinkSecret, normalizeManualCode } from "@/lib/auth-v2-format";
-import { buildInviteDeepLink, INVITE_INVALID_MESSAGE, INVITE_TTL_MS, parseInviteLink } from "@/lib/invite-core";
-import { claimInvite, createPartnerInvite, findRedeemableInvite, revokePartnerInvite } from "@/lib/invite.server";
+import {
+  buildInviteDeepLink,
+  INVITE_INVALID_MESSAGE,
+  INVITE_TTL_MS,
+  parseInviteLink,
+} from "@/lib/invite-core";
+import {
+  claimInvite,
+  createPartnerInvite,
+  findRedeemableInvite,
+  revokePartnerInvite,
+} from "@/lib/invite.server";
 
 process.env[AUTH_PEPPER_ENV] = "unit-test-pepper-value-0123456789";
 
@@ -98,7 +108,10 @@ describe("invite-core", () => {
   });
 
   it("parses ?join + #s and normalises the code", () => {
-    expect(parseInviteLink({ search: "?join=abcde-12345", hash: "#s=xyz" })).toEqual({ code: "ABCDE12345", secret: "xyz" });
+    expect(parseInviteLink({ search: "?join=abcde-12345", hash: "#s=xyz" })).toEqual({
+      code: "ABCDE12345",
+      secret: "xyz",
+    });
     expect(parseInviteLink({ search: "?join=ABCDE12345", hash: "" })?.secret).toBeNull();
     expect(parseInviteLink({ search: "?join=nope", hash: "" })?.code).toBe("");
     expect(parseInviteLink({ search: "?code=ABC123", hash: "" })).toBeNull();
@@ -136,7 +149,11 @@ describe("redeem", () => {
 
   it("finds a live invite by the keyed code digest and verifies the secret", async () => {
     const created = await seed();
-    const found = await findRedeemableInvite({ code: created.code, secret: created.linkSecret, now: NOW });
+    const found = await findRedeemableInvite({
+      code: created.code,
+      secret: created.linkSecret,
+      now: NOW,
+    });
     expect(found.pair_id).toBe(PAIR_ID);
     expect(found.manual_code_hmac).toBe(await manualCodeHmac(created.code));
     expect((await findRedeemableInvite({ code: created.code, now: NOW })).id).toBe(found.id);
@@ -144,14 +161,23 @@ describe("redeem", () => {
 
   it("fails with one neutral message for wrong secret, expiry, revoke and unknown codes", async () => {
     const created = await seed();
-    await expect(findRedeemableInvite({ code: created.code, secret: generateInviteLinkSecret(), now: NOW })).rejects.toThrow(INVITE_INVALID_MESSAGE);
     await expect(
-      findRedeemableInvite({ code: created.code, now: new Date(NOW.getTime() + INVITE_TTL_MS + 1) }),
+      findRedeemableInvite({ code: created.code, secret: generateInviteLinkSecret(), now: NOW }),
     ).rejects.toThrow(INVITE_INVALID_MESSAGE);
-    await expect(findRedeemableInvite({ code: "ZZZZZZZZZZ", now: NOW })).rejects.toThrow(INVITE_INVALID_MESSAGE);
+    await expect(
+      findRedeemableInvite({
+        code: created.code,
+        now: new Date(NOW.getTime() + INVITE_TTL_MS + 1),
+      }),
+    ).rejects.toThrow(INVITE_INVALID_MESSAGE);
+    await expect(findRedeemableInvite({ code: "ZZZZZZZZZZ", now: NOW })).rejects.toThrow(
+      INVITE_INVALID_MESSAGE,
+    );
 
     const revoked = await seed({ revoked_at: NOW.toISOString() });
-    await expect(findRedeemableInvite({ code: revoked.code, now: NOW })).rejects.toThrow(INVITE_INVALID_MESSAGE);
+    await expect(findRedeemableInvite({ code: revoked.code, now: NOW })).rejects.toThrow(
+      INVITE_INVALID_MESSAGE,
+    );
   });
 
   it("claims an invite exactly once, even for a repeated request", async () => {
@@ -161,7 +187,9 @@ describe("redeem", () => {
     expect(state.invites[0]!["consumed_by_session_id"]).toBe("sess-a");
     expect(await claimInvite({ inviteId: invite.id, sessionId: "sess-b", now: NOW })).toBe(false);
     expect(state.invites[0]!["consumed_by_session_id"]).toBe("sess-a");
-    await expect(findRedeemableInvite({ code: created.code, now: NOW })).rejects.toThrow(INVITE_INVALID_MESSAGE);
+    await expect(findRedeemableInvite({ code: created.code, now: NOW })).rejects.toThrow(
+      INVITE_INVALID_MESSAGE,
+    );
   });
 });
 
@@ -169,11 +197,15 @@ describe("revokePartnerInvite", () => {
   it("is scoped to the owner's pair and idempotent afterwards", async () => {
     const created = await createPartnerInvite({ pairId: PAIR_ID, sessionId: null, now: NOW });
     const inviteId = state.invites[0]!["id"] as string;
-    expect(await revokePartnerInvite({ pairId: "22222222-2222-2222-2222-222222222222", inviteId })).toBe(false);
+    expect(
+      await revokePartnerInvite({ pairId: "22222222-2222-2222-2222-222222222222", inviteId }),
+    ).toBe(false);
     expect(state.invites[0]!["revoked_at"]).toBeNull();
 
     expect(await revokePartnerInvite({ pairId: PAIR_ID, inviteId, now: NOW })).toBe(true);
     expect(await revokePartnerInvite({ pairId: PAIR_ID, inviteId, now: NOW })).toBe(false);
-    await expect(findRedeemableInvite({ code: created.code, now: NOW })).rejects.toThrow(INVITE_INVALID_MESSAGE);
+    await expect(findRedeemableInvite({ code: created.code, now: NOW })).rejects.toThrow(
+      INVITE_INVALID_MESSAGE,
+    );
   });
 });

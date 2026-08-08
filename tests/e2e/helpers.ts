@@ -80,7 +80,9 @@ export async function createTestPair(page: Page): Promise<TestPair> {
   await page.locator('input[type="date"]').fill("2024-01-01");
   await page.getByRole("button", { name: /Založit náš prostor/ }).click();
 
-  await expect(page.getByRole("button", { name: /Vytvořit náš prostor/ })).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByRole("button", { name: /Vytvořit náš prostor/ })).toHaveCount(0, {
+    timeout: 20_000,
+  });
   await expect.poll(() => readCachedPairId(page), { timeout: 20_000 }).toMatch(/^[0-9a-f-]{36}$/);
 
   const pairId = (await readCachedPairId(page))!;
@@ -94,13 +96,18 @@ export async function joinTestPair(page: Page, code: string, name: string): Prom
   await page.getByPlaceholder("ABCDE-FGHJK").fill(code);
   await page.getByPlaceholder("Tvé jméno").fill(name);
   await page.getByRole("button", { name: /Vstoupit/ }).click();
-  await expect(page.getByRole("button", { name: /Vytvořit náš prostor/ })).toHaveCount(0, { timeout: 20_000 });
+  await expect(page.getByRole("button", { name: /Vytvořit náš prostor/ })).toHaveCount(0, {
+    timeout: 20_000,
+  });
   await expect.poll(() => readCachedPairId(page), { timeout: 20_000 }).toMatch(/^[0-9a-f-]{36}$/);
 }
 
 export async function createInviteCode(page: Page): Promise<string> {
   await page.goto("/nastaveni", { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: /Vygenerovat nový kód/ }).first().click();
+  await page
+    .getByRole("button", { name: /Vygenerovat nový kód/ })
+    .first()
+    .click();
   const code = page.locator("span.font-display").first();
   await expect(code).toHaveText(/^[0-9A-Z]{5}-[0-9A-Z]{5}$/, { timeout: 20_000 });
   return (await code.innerText()).trim();
