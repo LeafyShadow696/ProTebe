@@ -8,7 +8,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -17,27 +17,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Format synchronized tests once
-        if: github.ref_name == 'sync/lovable-2026-08-08'
-        run: bunx prettier --write tests
-      - name: Commit test formatting if needed
-        if: github.ref_name == 'sync/lovable-2026-08-08'
-        run: |
-          if ! git diff --quiet -- tests; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add tests
-            git commit -m "style: format synchronized tests"
-            git push origin HEAD:sync/lovable-2026-08-08
-          fi
       - name: Unit tests
         run: bun run test:unit
       - name: Typecheck
