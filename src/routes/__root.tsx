@@ -20,7 +20,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
+    <div className="flex min-h-screen items-center justify-center px-6" role="main">
       <div className="max-w-md text-center">
         <h1 className="font-display text-6xl font-light veil-text">404</h1>
         <h2 className="mt-3 text-lg text-foreground">Tady nic není</h2>
@@ -48,7 +48,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
+    <div className="flex min-h-screen items-center justify-center px-6" role="alert">
       <div className="max-w-md text-center">
         <h1 className="font-display text-3xl font-light veil-text">Něco se nepovedlo</h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -56,6 +56,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
+            type="button"
             onClick={() => {
               router.invalidate();
               reset();
@@ -84,18 +85,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "#241a20" },
       { name: "author", content: "Pro Tebe" },
       { name: "robots", content: "noindex" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Pro Tebe" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/icon.svg" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Karla:wght@300;400;500;600&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
   shellComponent: RootShell,
@@ -137,7 +144,7 @@ function PairGate() {
   const { ready, pair, setPair } = usePairContext();
   if (!ready) {
     return (
-      <div className="relative z-10 flex min-h-[100dvh] items-center justify-center">
+      <div className="relative z-10 flex min-h-[100dvh] items-center justify-center" role="status" aria-live="polite">
         <span className="font-display text-3xl font-light tracking-wide veil-text">Pro Tebe</span>
       </div>
     );
