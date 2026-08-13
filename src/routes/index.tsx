@@ -136,7 +136,11 @@ function Dashboard() {
         }
         subtitle={
           partnerOnline ? (
-            <span className="inline-flex items-center gap-1.5 text-primary" role="status" aria-live="polite">
+            <span
+              className="inline-flex items-center gap-1.5 text-primary"
+              role="status"
+              aria-live="polite"
+            >
               <Wifi size={13} aria-hidden="true" /> {names.you} je právě s tebou v aplikaci
             </span>
           ) : (
@@ -152,7 +156,10 @@ function Dashboard() {
       {!pair.has_partner && pair.role === "owner" ? (
         <section className="px-4 sm:px-6" aria-labelledby="invite-heading">
           <GlassCard className="anim-fade-up p-4 sm:p-5">
-            <p id="invite-heading" className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground">
+            <p
+              id="invite-heading"
+              className="text-[10px] font-medium uppercase tracking-[0.28em] text-muted-foreground"
+            >
               Pozvi ji k nám
             </p>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -176,7 +183,10 @@ function Dashboard() {
         ) : nextEvent ? (
           <Link to="/kalendar" preload="intent" className="block">
             <GlassCard className="flex items-center gap-4 p-4 sm:p-5">
-              <div className="flex h-14 w-14 flex-none flex-col items-center justify-center rounded-2xl bg-primary/12" aria-hidden="true">
+              <div
+                className="flex h-14 w-14 flex-none flex-col items-center justify-center rounded-2xl bg-primary/12"
+                aria-hidden="true"
+              >
                 <span className="font-display text-xl leading-none text-foreground">
                   {Number(nextEvent.starts_on.slice(8, 10))}
                 </span>
@@ -195,7 +205,11 @@ function Dashboard() {
                   <p className="text-xs text-muted-foreground">{nextEvent.starts_at}</p>
                 ) : null}
               </div>
-              <CalendarHeart size={16} className="ml-auto flex-none text-primary" aria-hidden="true" />
+              <CalendarHeart
+                size={16}
+                className="ml-auto flex-none text-primary"
+                aria-hidden="true"
+              />
             </GlassCard>
           </Link>
         ) : null}
