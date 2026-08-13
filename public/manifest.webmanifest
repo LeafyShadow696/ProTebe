@@ -1,0 +1,20 @@
+{
+  "name": "Pro Tebe",
+  "short_name": "Pro Tebe",
+  "description": "Soukromý prostor pro dva — vzpomínky, vzkazy, galerie a společný kalendář.",
+  "lang": "cs",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#241a20",
+  "background_color": "#0f0b0d",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
