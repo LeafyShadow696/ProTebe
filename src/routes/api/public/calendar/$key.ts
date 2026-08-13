@@ -27,12 +27,17 @@ export const Route = createFileRoute("/api/public/calendar/$key")({
         if (!pair || (pair as { calendar_key: string }).calendar_key !== calendarKey)
           return new Response("Not found", { status: 404 });
 
-        const { data: events } = await supabaseAdmin
+        const { data: events, error: eventsError } = await supabaseAdmin
           .from("events")
           .select("id, title, note, starts_on, starts_at, all_day, updated_at")
           .eq("pair_id", pairId)
           .order("starts_on", { ascending: true })
+          .order("starts_at", { ascending: true, nullsFirst: true })
           .limit(1000);
+        if (eventsError) {
+          console.error(`[protebe] calendar/events: ${eventsError.message}`);
+          return new Response("Error", { status: 500 });
+        }
 
         const calendarName = `Pro Tebe — ${pair.owner_name} & ${pair.partner_name}`;
         const lines: string[] = [
@@ -85,7 +90,8 @@ export const Route = createFileRoute("/api/public/calendar/$key")({
           headers: {
             "Content-Type": "text/calendar; charset=utf-8",
             "Content-Disposition": 'inline; filename="pro-tebe.ics"',
-            "Cache-Control": "public, max-age=300",
+            "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
+            "X-Content-Type-Options": "nosniff",
           },
         });
       },
