@@ -35,9 +35,7 @@ export function PageHeader({
         <p className="text-[10px] font-medium uppercase tracking-[0.34em] text-muted-foreground">
           {eyebrow}
         </p>
-        <h1 className="mt-2 font-display text-4xl font-light leading-[1.05] veil-text">
-          {title}
-        </h1>
+        <h1 className="mt-2 font-display text-4xl font-light leading-[1.05] veil-text">{title}</h1>
         {subtitle ? (
           <p className="mt-2 max-w-[34rem] text-sm leading-relaxed text-muted-foreground">
             {subtitle}
