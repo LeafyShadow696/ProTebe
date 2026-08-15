@@ -149,7 +149,7 @@ export function Onboarding({ onReady }: { onReady: (pair: PublicPair) => void })
                   type="date"
                   value={anniversary}
                   onChange={(event) => setAnniversary(event.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-input bg-secondary/50 px-4 py-3 text-foreground outline-none focus:border-ring"
+                  className="field-input mt-2 w-full px-4 py-3 text-foreground outline-none"
                 />
               </label>
               <PrimaryButton loading={loading} onClick={handleCreate}>
@@ -165,7 +165,7 @@ export function Onboarding({ onReady }: { onReady: (pair: PublicPair) => void })
                 <span className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground">
                   Kód pro připojení
                 </span>
-                <div className="mt-2 flex items-center gap-3 rounded-2xl border border-input bg-secondary/50 px-4 py-3">
+                <div className="field-input mt-2 flex items-center gap-3 px-4 py-3">
                   <KeyRound size={16} className="text-primary" />
                   <input
                     value={joinCode}
@@ -208,10 +208,10 @@ function ChoiceButton({
   return (
     <button
       onClick={onClick}
-      className="glass-strong tap flex w-full items-center justify-between rounded-3xl px-5 py-4 text-left"
+      className="glass-strong tap flex w-full items-center justify-between rounded-3xl px-5 py-4 text-left ring-1 ring-white/6"
     >
       <span className="flex items-center gap-4">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12">
+        <span className="icon-well flex h-11 w-11 items-center justify-center rounded-2xl">
           {icon}
         </span>
         <span>
@@ -243,7 +243,7 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         maxLength={40}
-        className="mt-2 w-full rounded-2xl border border-input bg-secondary/50 px-4 py-3 text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
+        className="field-input mt-2 w-full px-4 py-3 text-foreground outline-none placeholder:text-muted-foreground"
       />
     </label>
   );
@@ -264,7 +264,7 @@ export function PrimaryButton({
     <button
       onClick={onClick}
       disabled={loading || disabled}
-      className="tap flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3.5 text-[15px] font-medium text-primary-foreground shadow-bloom disabled:opacity-60"
+      className="tap flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 py-3.5 text-[15px] font-medium text-primary-foreground shadow-bloom ring-1 ring-primary/45 disabled:opacity-60"
     >
       {loading ? <Loader2 size={16} className="animate-spin" /> : null}
       {children}

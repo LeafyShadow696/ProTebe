@@ -234,7 +234,7 @@ function CalendarPage() {
           </p>
           <button
             onClick={() => setComposerOpen((open) => !open)}
-            className="tap flex items-center gap-1.5 rounded-full bg-primary/12 px-3 py-1.5 text-xs text-primary"
+            className="tap flex items-center gap-1.5 rounded-full bg-primary/12 px-3 py-1.5 text-xs text-primary ring-1 ring-primary/30"
           >
             {composerOpen ? <X size={13} /> : <Plus size={13} />}
             {composerOpen ? "Zavřít" : "Přidat"}
@@ -248,7 +248,7 @@ function CalendarPage() {
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Co nás čeká?"
                 maxLength={120}
-                className="w-full bg-transparent font-display text-xl font-light outline-none placeholder:text-muted-foreground"
+                className="field-input w-full border-none bg-transparent px-2 py-1 font-display text-xl font-light outline-none placeholder:text-muted-foreground"
               />
               <textarea
                 value={note}
@@ -256,21 +256,21 @@ function CalendarPage() {
                 rows={2}
                 maxLength={600}
                 placeholder="Detail, místo, poznámka…"
-                className="w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="field-input w-full resize-none border-none bg-transparent px-2 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
               />
               <div className="flex flex-wrap gap-1.5">
                 {KINDS.map((option) => (
                   <button
                     key={option.value}
                     onClick={() => setKind(option.value)}
-                    className={`tap rounded-full px-3 py-1.5 text-xs transition-colors ${kind === option.value ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground"}`}
+                    className={`tap rounded-full px-3 py-1.5 text-xs transition-colors ${kind === option.value ? "bg-primary text-primary-foreground ring-1 ring-primary/45" : "bg-secondary/50 text-muted-foreground ring-1 ring-white/8"}`}
                   >
                     {option.emoji} {option.label}
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-2">
-                <label className="flex flex-1 items-center gap-2 rounded-2xl bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+                <label className="field-input flex flex-1 items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
                   Čas
                   <input
                     type="time"

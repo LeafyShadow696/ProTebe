@@ -72,7 +72,7 @@ function SettingsPage() {
               type="date"
               value={anniversary}
               onChange={(event) => setAnniversary(event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-input bg-secondary/50 px-4 py-3 text-foreground outline-none focus:border-ring"
+              className="field-input mt-2 w-full px-4 py-3 text-foreground outline-none"
             />
           </label>
           <PrimaryButton loading={save.isPending} onClick={() => save.mutate()}>
@@ -106,7 +106,7 @@ function SettingsPage() {
       <section className="space-y-3 px-6">
         <button
           onClick={toggleTheme}
-          className="glass tap flex w-full items-center justify-between rounded-3xl px-5 py-4"
+          className="glass tap flex w-full items-center justify-between rounded-3xl px-5 py-4 ring-1 ring-white/6"
         >
           <span className="text-sm text-foreground">
             {theme === "dark" ? "Noční vzhled" : "Denní vzhled"}
@@ -127,7 +127,7 @@ function SettingsPage() {
               .catch(() => toast.error("Odhlášení se na serveru nepodařilo dokončit."))
               .finally(() => setLeaving(false));
           }}
-          className="glass tap flex w-full items-center justify-between rounded-3xl px-5 py-4"
+          className="glass tap flex w-full items-center justify-between rounded-3xl px-5 py-4 ring-1 ring-white/6"
         >
           <span className="text-sm text-foreground">Odhlásit toto zařízení</span>
           <LogOut size={17} className="text-muted-foreground" />
@@ -170,7 +170,7 @@ function InviteCard() {
         <>
           <button
             onClick={() => copy(ticket.code, "Kód zkopírován")}
-            className="tap flex w-full items-center justify-between rounded-2xl bg-secondary/40 px-4 py-3"
+            className="tap flex w-full items-center justify-between rounded-2xl bg-secondary/40 px-4 py-3 ring-1 ring-white/8"
           >
             <span className="font-display text-xl tracking-[0.22em] text-foreground">
               {ticket.display_code}
@@ -230,7 +230,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         maxLength={40}
-        className="mt-2 w-full rounded-2xl border border-input bg-secondary/50 px-4 py-3 text-foreground outline-none focus:border-ring"
+        className="field-input mt-2 w-full px-4 py-3 text-foreground outline-none"
       />
     </label>
   );

@@ -12,18 +12,18 @@ const TABS = [
 export function BottomTabBar() {
   return (
     <nav className="fixed bottom-0 left-1/2 z-30 w-full max-w-[480px] -translate-x-1/2 px-4 pb-safe">
-      <div className="glass-strong mb-3 flex items-center justify-between rounded-full px-2 py-2">
+      <div className="glass-strong mb-3 flex items-center justify-between rounded-full border-white/15 px-2 py-2 shadow-bloom">
         {TABS.map(({ to, label, icon: Icon }) => (
           <Link
             key={to}
             to={to}
             preload="intent"
             aria-label={label}
-            className="tap flex flex-1 flex-col items-center gap-1 rounded-full py-2 text-muted-foreground"
+            className="tap flex flex-1 flex-col items-center gap-1 rounded-full py-2 text-muted-foreground/95"
             activeOptions={{ exact: to === "/" }}
             activeProps={{
               className:
-                "tap flex flex-1 flex-col items-center gap-1 rounded-full py-2 text-primary bg-primary/10",
+                "tap flex flex-1 flex-col items-center gap-1 rounded-full py-2 text-primary bg-primary/14 ring-1 ring-primary/35",
             }}
           >
             <Icon size={19} strokeWidth={1.6} />

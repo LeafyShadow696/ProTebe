@@ -138,7 +138,7 @@ function PairGate() {
   if (!ready) {
     return (
       <div className="relative z-10 flex min-h-[100dvh] items-center justify-center">
-        <span className="font-display text-3xl font-light tracking-wide veil-text">Pro Tebe</span>
+        <span className="font-display text-4xl font-light tracking-wide veil-text">Pro Tebe</span>
       </div>
     );
   }
@@ -146,6 +146,7 @@ function PairGate() {
   return (
     <SyncProvider pairId={pair.id} role={pair.role}>
       <div className="relative z-10 mx-auto min-h-[100dvh] w-full max-w-[480px] pb-28">
+        <div className="pointer-events-none absolute inset-x-8 top-3 -z-10 h-32 rounded-full bg-primary/10 blur-3xl" />
         <Outlet />
         <BottomTabBar />
       </div>

@@ -98,7 +98,7 @@ function GalleryPage() {
           <button
             onClick={() => inputRef.current?.click()}
             aria-label="Přidat fotku"
-            className="glass-strong tap mt-1 flex h-11 w-11 flex-none items-center justify-center rounded-2xl"
+            className="glass-strong tap mt-1 flex h-11 w-11 flex-none items-center justify-center rounded-2xl ring-1 ring-white/10"
           >
             {upload.isPending ? (
               <Loader2 size={17} className="animate-spin text-primary" />
@@ -133,7 +133,7 @@ function GalleryPage() {
               <button
                 key={photo.id}
                 onClick={() => setActive(photo)}
-                className="tap cv-auto mb-3 block w-full overflow-hidden rounded-3xl"
+                className="tap cv-auto mb-3 block w-full overflow-hidden rounded-3xl ring-1 ring-white/10"
               >
                 <SmartImage
                   src={photo.url}

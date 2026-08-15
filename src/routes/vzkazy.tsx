@@ -183,7 +183,7 @@ function MessagesPage() {
                 </p>
                 <button
                   onClick={() => patch.mutate({ id: message.id, pinned: false })}
-                  className="tap mt-2 text-[11px] text-muted-foreground"
+                  className="tap mt-2 text-[11px] text-muted-foreground underline-offset-4 hover:underline"
                 >
                   Odepnout
                 </button>
@@ -263,7 +263,7 @@ function MessagesPage() {
                 type="datetime-local"
                 value={capsule}
                 onChange={(event) => setCapsule(event.target.value)}
-                className="w-full bg-transparent text-xs text-foreground outline-none"
+                className="field-input w-full border-none bg-transparent px-1 py-1 text-xs text-foreground outline-none"
               />
             </label>
           ) : null}
@@ -297,7 +297,7 @@ function MessagesPage() {
               onClick={submit}
               disabled={!body.trim()}
               aria-label="Poslat vzkaz"
-              className="tap mb-0.5 flex h-10 w-10 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground shadow-bloom transition-opacity disabled:opacity-40"
+              className="tap mb-0.5 flex h-10 w-10 flex-none items-center justify-center rounded-full bg-primary text-primary-foreground shadow-bloom ring-1 ring-primary/45 transition-opacity disabled:opacity-40"
             >
               <Send size={16} />
             </button>

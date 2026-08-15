@@ -157,7 +157,7 @@ function Dashboard() {
             <Link
               to="/nastaveni"
               preload="intent"
-              className="tap mt-4 flex w-full items-center justify-between rounded-2xl bg-primary/12 px-4 py-3 text-sm text-primary"
+              className="tap mt-4 flex w-full items-center justify-between rounded-2xl bg-primary/12 px-4 py-3 text-sm text-primary ring-1 ring-primary/28"
             >
               Vytvořit kód pro připojení
               <Settings2 size={16} />
@@ -172,7 +172,7 @@ function Dashboard() {
         ) : nextEvent ? (
           <Link to="/kalendar" preload="intent" className="block">
             <GlassCard className="flex items-center gap-4 p-5">
-              <div className="flex h-14 w-14 flex-none flex-col items-center justify-center rounded-2xl bg-primary/12">
+              <div className="icon-well flex h-14 w-14 flex-none flex-col items-center justify-center rounded-2xl">
                 <span className="font-display text-xl leading-none text-foreground">
                   {Number(nextEvent.starts_on.slice(8, 10))}
                 </span>
