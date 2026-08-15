@@ -248,7 +248,7 @@ function CalendarPage() {
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Co nás čeká?"
                 maxLength={120}
-                className="field-input w-full border-none bg-transparent px-2 py-1 font-display text-xl font-light outline-none placeholder:text-muted-foreground"
+                className="field-input w-full border-none bg-transparent px-2 py-1 font-display text-xl font-light placeholder:text-muted-foreground"
               />
               <textarea
                 value={note}
@@ -256,7 +256,7 @@ function CalendarPage() {
                 rows={2}
                 maxLength={600}
                 placeholder="Detail, místo, poznámka…"
-                className="field-input w-full resize-none border-none bg-transparent px-2 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="field-input w-full resize-none border-none bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground"
               />
               <div className="flex flex-wrap gap-1.5">
                 {KINDS.map((option) => (

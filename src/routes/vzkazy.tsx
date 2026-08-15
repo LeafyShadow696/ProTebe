@@ -144,10 +144,13 @@ function MessagesPage() {
   };
 
   const all = messages.data ?? [];
-  const pinned = all.filter((message) => message.pinned);
+  const pinned = useMemo(
+    () => (messages.data ?? []).filter((message) => message.pinned),
+    [messages.data],
+  );
   const today = new Date().toISOString().slice(0, 10);
   const timeline = useMemo(() => {
-    const ordered = [...all].reverse();
+    const ordered = [...(messages.data ?? [])].reverse();
     const groups: { day: string; items: MessageView[] }[] = [];
     for (const message of ordered) {
       const day = message.created_at.slice(0, 10);
@@ -156,7 +159,7 @@ function MessagesPage() {
       else groups.push({ day, items: [message] });
     }
     return groups;
-  }, [all]);
+  }, [messages.data]);
 
   return (
     <div className="space-y-5 pb-32">
@@ -263,7 +266,7 @@ function MessagesPage() {
                 type="datetime-local"
                 value={capsule}
                 onChange={(event) => setCapsule(event.target.value)}
-                className="field-input w-full border-none bg-transparent px-1 py-1 text-xs text-foreground outline-none"
+                className="field-input w-full border-none bg-transparent px-1 py-1 text-xs text-foreground"
               />
             </label>
           ) : null}

@@ -12,7 +12,7 @@ const TABS = [
 export function BottomTabBar() {
   return (
     <nav className="fixed bottom-0 left-1/2 z-30 w-full max-w-[480px] -translate-x-1/2 px-4 pb-safe">
-      <div className="glass-strong mb-3 flex items-center justify-between rounded-full border-white/15 px-2 py-2 shadow-bloom">
+      <div className="glass-strong mb-3 flex items-center justify-between rounded-full px-2 py-2 shadow-bloom ring-1 ring-white/15">
         {TABS.map(({ to, label, icon: Icon }) => (
           <Link
             key={to}
