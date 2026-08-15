@@ -35,7 +35,7 @@ export const listPhotos = createServerFn({ method: "POST" }).handler(
 );
 
 export const deletePhoto = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) =>
     withSession(async ({ pair }) => {
       const supabase = await adminClient();

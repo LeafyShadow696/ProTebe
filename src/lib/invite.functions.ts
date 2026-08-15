@@ -35,7 +35,7 @@ export const createInvite = createServerFn({ method: "POST" }).handler(async () 
 const RevokeInput = z.object({ invite_id: z.string().uuid() });
 
 export const revokeInvite = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => RevokeInput.parse(input))
+  .validator((input: unknown) => RevokeInput.parse(input))
   .handler(async ({ data }) =>
     withSession(async ({ pair, role }): Promise<{ ok: true }> => {
       if (role !== "owner") throw new Error(OWNER_ONLY_MESSAGE);

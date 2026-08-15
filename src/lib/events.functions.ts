@@ -61,7 +61,7 @@ const CreateInput = z.object({
 });
 
 export const createEvent = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => CreateInput.parse(input))
+  .validator((input: unknown) => CreateInput.parse(input))
   .handler(async ({ data }) =>
     withSession(async ({ pair, role }) => {
       const supabase = await adminClient();
@@ -81,7 +81,7 @@ export const createEvent = createServerFn({ method: "POST" })
   );
 
 export const deleteEvent = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) =>
     withSession(async ({ pair }) => {
       const supabase = await adminClient();
