@@ -42,7 +42,7 @@ const CreateInput = z.object({
 });
 
 export const createPair = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => CreateInput.parse(input))
+  .validator((input: unknown) => CreateInput.parse(input))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
     const ownerToken = randomToken();
@@ -87,7 +87,7 @@ async function discardSession(sessionId: string): Promise<void> {
 }
 
 export const joinPair = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => JoinInput.parse(input))
+  .validator((input: unknown) => JoinInput.parse(input))
   .handler(async ({ data }) => {
     const code = normalizeManualCode(data.code);
     if (!code) throw new Error(INVITE_INVALID_MESSAGE);
@@ -155,7 +155,7 @@ const UpdateInput = z.object({
 });
 
 export const updatePair = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => UpdateInput.parse(input ?? {}))
+  .validator((input: unknown) => UpdateInput.parse(input ?? {}))
   .handler(async ({ data }) =>
     withSession(async ({ pair, role }) => {
       const patch: { owner_name?: string; partner_name?: string; anniversary?: string } = {};
@@ -193,7 +193,7 @@ export type ResumeResult =
   | { status: "gone" };
 
 export const resumeSession = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => ResumeInput.parse(input ?? {}))
+  .validator((input: unknown) => ResumeInput.parse(input ?? {}))
   .handler(async ({ data }): Promise<ResumeResult> => {
     const current = await resolveSessionFromCookie();
     if (current) {

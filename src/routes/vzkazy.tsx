@@ -143,8 +143,8 @@ function MessagesPage() {
     send.mutate({ text, deliver: capsule ? new Date(capsule).toISOString() : null });
   };
 
-  const all = messages.data ?? [];
-  const pinned = all.filter((message) => message.pinned);
+  const all = useMemo(() => messages.data ?? [], [messages.data]);
+  const pinned = useMemo(() => all.filter((message) => message.pinned), [all]);
   const today = new Date().toISOString().slice(0, 10);
   const timeline = useMemo(() => {
     const ordered = [...all].reverse();
