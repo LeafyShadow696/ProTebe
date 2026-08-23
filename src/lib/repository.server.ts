@@ -39,3 +39,9 @@ export function updatePair(id: string, patch: Record<string, string | null>) {
   getDatabase().prepare(sql).run(...keys.map((key) => patch[key] ?? null), id);
   return findPairById(id);
 }
+
+export type MessageRecord = { id: string; pair_id: string; author: "owner" | "partner"; body: string; reaction: string | null; pinned: number; deliver_at: string | null; created_at: string };
+export function listMessageRecords(pairId: string): MessageRecord[] { return getDatabase().prepare("SELECT * FROM messages WHERE pair_id = ? ORDER BY created_at DESC LIMIT 300").all(pairId) as unknown as MessageRecord[]; }
+export function insertMessage(input: Omit<MessageRecord, "id" | "created_at" | "reaction" | "pinned">) { const row = { ...input, id: randomUUID(), reaction: null, pinned: 0, created_at: new Date().toISOString() }; getDatabase().prepare("INSERT INTO messages (id, pair_id, author, body, reaction, pinned, deliver_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(row.id, row.pair_id, row.author, row.body, row.reaction, row.pinned, row.deliver_at, row.created_at); return row; }
+export function updateMessageRecord(pairId: string, id: string, patch: { reaction?: string | null; pinned?: boolean }) { const keys = Object.keys(patch); if (!keys.length) return; getDatabase().prepare(`UPDATE messages SET ${keys.map((key) => `${key} = ?`).join(", ")} WHERE pair_id = ? AND id = ?`).run(...keys.map((key) => { const value = patch[key as keyof typeof patch]; return value === undefined ? null : typeof value === "boolean" ? (value ? 1 : 0) : value; }), pairId, id); }
+export function deleteMessageRecord(pairId: string, id: string) { getDatabase().prepare("DELETE FROM messages WHERE pair_id = ? AND id = ?").run(pairId, id); }
