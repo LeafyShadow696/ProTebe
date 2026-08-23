@@ -55,13 +55,22 @@ export function getDatabase(): DatabaseSync {
       title TEXT NOT NULL, starts_on TEXT NOT NULL, starts_at TEXT, all_day INTEGER NOT NULL DEFAULT 1,
       kind TEXT NOT NULL DEFAULT 'moment', author TEXT NOT NULL DEFAULT 'owner', note TEXT, created_at TEXT NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS events_pair_date_idx ON events(pair_id, date);
+    CREATE INDEX IF NOT EXISTS events_pair_date_idx ON events(pair_id, starts_on, starts_at);
     CREATE TABLE IF NOT EXISTS invites (
       id TEXT PRIMARY KEY, pair_id TEXT NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
       code TEXT NOT NULL UNIQUE, secret_hash TEXT, expires_at TEXT, redeemed_at TEXT,
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS invites_pair_idx ON invites(pair_id);
+    CREATE TABLE IF NOT EXISTS pair_invites (
+      id TEXT PRIMARY KEY, pair_id TEXT NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+      created_by_session_id TEXT, target_role TEXT NOT NULL,
+      link_secret_digest TEXT NOT NULL, manual_code_hmac TEXT,
+      created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+      consumed_at TEXT, consumed_by_session_id TEXT, revoked_at TEXT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS pair_invites_code_idx ON pair_invites(manual_code_hmac);
+    CREATE INDEX IF NOT EXISTS pair_invites_pair_idx ON pair_invites(pair_id, target_role);
   `);
   return database;
 }
