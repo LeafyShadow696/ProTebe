@@ -14,6 +14,7 @@ import { Route as GalerieRouteImport } from './routes/galerie'
 import { Route as KalendarRouteImport } from './routes/kalendar'
 import { Route as NastaveniRouteImport } from './routes/nastaveni'
 import { Route as VzkazyRouteImport } from './routes/vzkazy'
+import { Route as ApiPhotosIdRouteImport } from './routes/api/photos/$id'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiPublicCalendarKeyRouteImport } from './routes/api/public/calendar/$key'
 
@@ -42,6 +43,11 @@ const VzkazyRoute = VzkazyRouteImport.update({
   path: '/vzkazy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPhotosIdRoute = ApiPhotosIdRouteImport.update({
+  id: '/api/photos/$id',
+  path: '/api/photos/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
   id: '/api/public/upload',
   path: '/api/public/upload',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/kalendar': typeof KalendarRoute
   '/nastaveni': typeof NastaveniRoute
   '/vzkazy': typeof VzkazyRoute
+  '/api/photos/$id': typeof ApiPhotosIdRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/public/calendar/$key': typeof ApiPublicCalendarKeyRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/kalendar': typeof KalendarRoute
   '/nastaveni': typeof NastaveniRoute
   '/vzkazy': typeof VzkazyRoute
+  '/api/photos/$id': typeof ApiPhotosIdRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/public/calendar/$key': typeof ApiPublicCalendarKeyRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/kalendar': typeof KalendarRoute
   '/nastaveni': typeof NastaveniRoute
   '/vzkazy': typeof VzkazyRoute
+  '/api/photos/$id': typeof ApiPhotosIdRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/public/calendar/$key': typeof ApiPublicCalendarKeyRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/kalendar'
     | '/nastaveni'
     | '/vzkazy'
+    | '/api/photos/$id'
     | '/api/public/upload'
     | '/api/public/calendar/$key'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/kalendar'
     | '/nastaveni'
     | '/vzkazy'
+    | '/api/photos/$id'
     | '/api/public/upload'
     | '/api/public/calendar/$key'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/kalendar'
     | '/nastaveni'
     | '/vzkazy'
+    | '/api/photos/$id'
     | '/api/public/upload'
     | '/api/public/calendar/$key'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   KalendarRoute: typeof KalendarRoute
   NastaveniRoute: typeof NastaveniRoute
   VzkazyRoute: typeof VzkazyRoute
+  ApiPhotosIdRoute: typeof ApiPhotosIdRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiPublicCalendarKeyRoute: typeof ApiPublicCalendarKeyRoute
 }
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VzkazyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/photos/$id': {
+      id: '/api/photos/$id'
+      path: '/api/photos/$id'
+      fullPath: '/api/photos/$id'
+      preLoaderRoute: typeof ApiPhotosIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/upload': {
       id: '/api/public/upload'
       path: '/api/public/upload'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   KalendarRoute: KalendarRoute,
   NastaveniRoute: NastaveniRoute,
   VzkazyRoute: VzkazyRoute,
+  ApiPhotosIdRoute: ApiPhotosIdRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiPublicCalendarKeyRoute: ApiPublicCalendarKeyRoute,
 }
