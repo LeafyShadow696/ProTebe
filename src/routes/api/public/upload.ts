@@ -47,31 +47,12 @@ export const Route = createFileRoute("/api/public/upload")({
           if (!session) return json({ error: "Chybí přihlášení páru." }, 401);
           const pair = session.pair;
 
-          const { adminClient } = await import("@/lib/protebe.server");
-          const supabase = await adminClient();
-          const path = `${pair.id}/${crypto.randomUUID()}.${extension}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from("memories")
-            .upload(path, bytes, { contentType, upsert: false });
-          if (uploadError) {
-            console.error(`[protebe] upload/storage: ${uploadError.message}`);
-            return json({ error: "Fotku se nepodařilo uložit. Zkus to prosím znovu." }, 500);
-          }
-
+          const { saveUpload } = await import("@/lib/local-storage.server");
+          const { insertPhoto } = await import("@/lib/repository.server");
+          const path = await saveUpload(pair.id, extension, bytes);
           const rawCaption = request.headers.get("x-caption");
           const caption = rawCaption ? decodeURIComponent(rawCaption).slice(0, 160) : null;
-
-          const { error: insertError } = await supabase.from("photos").insert({
-            pair_id: pair.id,
-            storage_path: path,
-            caption: caption && caption.length > 0 ? caption : null,
-          });
-          if (insertError) {
-            console.error(`[protebe] upload/insert: ${insertError.message}`);
-            return json({ error: "Fotku se nepodařilo uložit. Zkus to prosím znovu." }, 500);
-          }
-
+          insertPhoto(pair.id, path, caption && caption.length > 0 ? caption : null);
           return json({ ok: true, path });
         } catch (error) {
           console.error(`[protebe] upload: ${error instanceof Error ? error.message : error}`);
