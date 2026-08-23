@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { withSession } from "./auth-session.server";
-import { adminClient, dbFailure } from "./protebe.server";
+import { insertEvent, listEventRecords, deleteEventRecord } from "./repository.server";
 
 export const EVENT_KINDS = ["moment", "date", "anniversary", "reminder", "trip"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -25,16 +25,8 @@ function asKind(value: string): EventKind {
 export const listEvents = createServerFn({ method: "POST" }).handler(
   async (): Promise<EventView[]> =>
     withSession(async ({ pair, role }) => {
-      const supabase = await adminClient();
-      const { data: rows, error } = await supabase
-        .from("events")
-        .select("*")
-        .eq("pair_id", pair.id)
-        .order("starts_on", { ascending: true })
-        .order("starts_at", { ascending: true, nullsFirst: true })
-        .limit(500);
-      if (error) throw dbFailure("events#1", error);
-      return (rows ?? []).map((row) => ({
+      const rows = listEventRecords(pair.id);
+      return rows.map((row) => ({
         id: row.id,
         title: row.title,
         note: row.note,
@@ -64,18 +56,7 @@ export const createEvent = createServerFn({ method: "POST" })
   .validator((input: unknown) => CreateInput.parse(input))
   .handler(async ({ data }) =>
     withSession(async ({ pair, role }) => {
-      const supabase = await adminClient();
-      const { error } = await supabase.from("events").insert({
-        pair_id: pair.id,
-        author: role,
-        title: data.title,
-        note: data.note?.trim() ? data.note.trim() : null,
-        starts_on: data.starts_on,
-        starts_at: data.starts_at ?? null,
-        all_day: !data.starts_at,
-        kind: data.kind ?? "moment",
-      });
-      if (error) throw dbFailure("events#2", error);
+      insertEvent({ pair_id: pair.id, author: role, title: data.title, note: data.note?.trim() ? data.note.trim() : null, starts_on: data.starts_on, starts_at: data.starts_at ?? null, all_day: !data.starts_at, kind: data.kind ?? "moment" });
       return { ok: true };
     }),
   );
@@ -84,13 +65,7 @@ export const deleteEvent = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) =>
     withSession(async ({ pair }) => {
-      const supabase = await adminClient();
-      const { error } = await supabase
-        .from("events")
-        .delete()
-        .eq("id", data.id)
-        .eq("pair_id", pair.id);
-      if (error) throw dbFailure("events#4", error);
+      deleteEventRecord(pair.id, data.id);
       return { ok: true };
     }),
   );

@@ -52,7 +52,8 @@ export function getDatabase(): DatabaseSync {
     CREATE INDEX IF NOT EXISTS photos_pair_created_idx ON photos(pair_id, created_at DESC);
     CREATE TABLE IF NOT EXISTS events (
       id TEXT PRIMARY KEY, pair_id TEXT NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
-      title TEXT NOT NULL, date TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL
+      title TEXT NOT NULL, starts_on TEXT NOT NULL, starts_at TEXT, all_day INTEGER NOT NULL DEFAULT 1,
+      kind TEXT NOT NULL DEFAULT 'moment', author TEXT NOT NULL DEFAULT 'owner', note TEXT, created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS events_pair_date_idx ON events(pair_id, date);
     CREATE TABLE IF NOT EXISTS invites (
